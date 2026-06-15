@@ -29,7 +29,7 @@ impl<'a> VirtioBlkOperation for ModernMode<'a> {
 
         // read features LOW
         self.blk.write_device_features_sel(0);
-        let mut features_low: VirtioBlkFeaturesLow = self.blk.read_device_features();
+        let mut features_low: VirtioBlkFeaturesLow = self.blk.device_features();
         debug!("features_low : {:#b}", features_low);
         self.blk.write_driver_features_sel(0);
         features_low.set_readonly(false);
@@ -37,7 +37,7 @@ impl<'a> VirtioBlkOperation for ModernMode<'a> {
 
         // read features HIGH
         self.blk.write_device_features_sel(1);
-        let mut features_high: VirtioBlkFeaturesHigh = self.blk.read_device_features();
+        let mut features_high: VirtioBlkFeaturesHigh = self.blk.device_features();
         debug!("features_high: {:#b}", features_high);
 
         if !features_high.version_1() {
@@ -54,7 +54,7 @@ impl<'a> VirtioBlkOperation for ModernMode<'a> {
         self.blk.write_status(status);
 
         // READ BACK CHECK
-        let got_status: Status = self.blk.read_status();
+        let got_status: Status = self.blk.status();
         if !got_status.features_ok() {
             return Err(-2);
         }

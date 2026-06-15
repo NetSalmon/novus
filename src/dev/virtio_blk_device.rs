@@ -5,10 +5,12 @@ pub mod queue;
 use crate::dev::Device;
 use crate::dev::virtio_blk_device::legacy::LegacyMode;
 use crate::dev::virtio_blk_device::modern::ModernMode;
-use crate::dev::virtio_blk_device::queue::{Queue, VirtioDesc, get_queue_mut};
-use crate::{bits, debug, error, info, mmio_regs, println};
-use core::ptr::{addr_of, read_volatile};
-use core::sync::atomic::{Ordering, compiler_fence};
+use crate::dev::virtio_blk_device::queue::{
+    Flags, Queue, VirtioAvail, VirtioDesc, VirtioDescTable, VirtioUsed, get_mut, get_queue_mut,
+};
+use crate::{bits, debug, error, info, mmio_regs, print, println};
+use core::ptr::addr_of;
+use core::sync::atomic::Ordering;
 
 pub struct VirtioBlk {
     pub device: Device,
@@ -95,7 +97,7 @@ const VIRTIO_VERSION_LEGACY: u32 = 1;
 
 impl VirtioBlk {
     pub fn handshake(&mut self) -> Result<(), isize> {
-        if self.read_version() != VIRTIO_VERSION_LEGACY {
+        if self.version() != VIRTIO_VERSION_LEGACY {
             Ok(ModernMode { blk: self }.handshake()?)
         } else {
             Ok(LegacyMode { blk: self }.handshake()?)
@@ -112,10 +114,10 @@ impl VirtioBlk {
         let start = self.device.mmio.start;
         let size = self.device.mmio.size;
 
-        let magic_value = self.read_magic_value();
+        let magic_value = self.magic_value();
         let is_virtio_mmio = magic_value == MAGIC_VALUE;
 
-        let version = self.read_version();
+        let version = self.version();
 
         debug!(
             "version: {} - {}",
@@ -123,7 +125,7 @@ impl VirtioBlk {
             if version == 1 { "legacy" } else { "modern" }
         );
 
-        let device_id = self.read_device_id();
+        let device_id = self.device_id();
 
         if is_virtio_mmio && device_id == 2 {
             self.handshake().unwrap();
@@ -144,101 +146,99 @@ impl VirtioBlk {
     }
 
     pub fn test_read(&self) {
-        const VIRTIO_BLK_T_IN: u32 = 0;
-        const NEXT: u16 = 1;
-        const WRITE: u16 = 2;
+        const VIRTIO_BLK_T_GET_ID: u32 = 8;
+        const NEXT: Flags = 1;
 
-        // Use BSS memory for request, buffer, and status (avoid stack addresses)
         static mut DISK_REQ: VirtioBlkReq = VirtioBlkReq {
             type_: 0,
             reserved: 0,
             sector: 0,
         };
+        let require_addr = unsafe { core::ptr::addr_of_mut!(DISK_STATUS) } as u64;
         static mut DISK_BUF: [u8; 512] = [0u8; 512];
+        let buffer_addr = unsafe { core::ptr::addr_of_mut!(DISK_BUF) } as u64;
         static mut DISK_STATUS: u8 = 0;
+        let status_addr = unsafe { core::ptr::addr_of_mut!(DISK_STATUS) } as u64;
 
         unsafe {
             core::ptr::write(
                 core::ptr::addr_of_mut!(DISK_REQ),
                 VirtioBlkReq {
-                    type_: 8,
+                    type_: VIRTIO_BLK_T_GET_ID,
                     reserved: 0,
                     sector: 0,
                 },
             );
         }
 
-        let queue_ptr = get_queue_mut();
+        let queue = get_mut();
 
-        const AVAIL_OFFSET: usize = 512;
-        const USED_OFFSET: usize = 4096;
+        let last_used = queue.used.idx;
 
-        let desc_base = queue_ptr as usize;
-        let avail_base = desc_base + AVAIL_OFFSET;
-        let used_base = desc_base + USED_OFFSET;
+        queue.desc.data[0] = VirtioDesc {
+            addr: require_addr,
+            len: size_of::<VirtioBlkReq>() as u32,
+            flags: NEXT, // NEXT
+            next: 1,
+        };
 
-        unsafe {
-            // desc[0]
-            *(desc_base as *mut u64) = core::ptr::addr_of_mut!(DISK_REQ) as u64;
-            *((desc_base + 8) as *mut u32) = size_of::<VirtioBlkReq>() as u32;
-            *((desc_base + 12) as *mut u16) = NEXT;
-            *((desc_base + 14) as *mut u16) = 1;
+        queue.desc.data[1] = VirtioDesc {
+            addr: buffer_addr,
+            len: 512,
+            flags: 3, // NEXT | WRITE
+            next: 2,
+        };
 
-            // desc[1]
-            let d1 = desc_base + size_of::<VirtioDesc>();
-            *(d1 as *mut u64) = core::ptr::addr_of_mut!(DISK_BUF) as u64;
-            *((d1 + 8) as *mut u32) = 512;
-            *((d1 + 12) as *mut u16) = NEXT | WRITE;
-            *((d1 + 14) as *mut u16) = 2;
+        queue.desc.data[2] = VirtioDesc {
+            addr: status_addr,
+            len: 1,
+            flags: 2, // WRITE
+            next: 0,
+        };
 
-            // desc[2]
-            let d2 = desc_base + 2 * size_of::<VirtioDesc>();
-            *(d2 as *mut u64) = core::ptr::addr_of_mut!(DISK_STATUS) as u64;
-            *((d2 + 8) as *mut u32) = 1;
-            *((d2 + 12) as *mut u16) = WRITE;
-            *((d2 + 14) as *mut u16) = 0;
+        queue.avail.ring[0] = 0;
+        queue.avail.idx = 2;
 
-            // avail
-            let last_used = *((used_base + 2) as *const u16);
-            *((avail_base + 4) as *mut u16) = 0;
-            *((avail_base + 2) as *mut u16) = 2;
+        core::sync::atomic::fence(Ordering::SeqCst);
 
+        debug!(
+            "BEFORE NOTIFY: avail_idx={}, avail_ring[0]={}, desc0=({:#x}, {}, {:#x}, {}), queue @ 0x{:x}",
+            queue.avail.idx,
+            queue.avail.ring[0],
+            queue.desc.data[0].addr,
+            queue.desc.data[0].len,
+            queue.desc.data[0].flags,
+            queue.desc.data[0].next,
+            queue as *const _ as usize,
+        );
+
+        self.write_queue_notify(0);
+        core::sync::atomic::fence(Ordering::SeqCst);
+        debug!("AFTER NOTIFY");
+
+        let mut guard = 0usize;
+        while queue.used.idx == last_used {
             core::sync::atomic::fence(Ordering::SeqCst);
-            // Verify data before notify
-            let d0_addr = *(desc_base as *const u64);
-            let d0_len = *((desc_base + 8) as *const u32);
-            let d0_flags = *((desc_base + 12) as *const u16);
-            let d0_next = *((desc_base + 14) as *const u16);
-            let avail_idx = *((avail_base + 2) as *const u16);
-            let avail_ring0 = *((avail_base + 4) as *const u16);
-            debug!(
-                "BEFORE NOTIFY: avail_idx={}, avail_ring[0]={}, desc0=({:#x}, {}, {:#x}, {}), queue=0x{:x}",
-                avail_idx, avail_ring0, d0_addr, d0_len, d0_flags, d0_next, queue_ptr as usize
-            );
-
-            self.write_queue_notify(0);
-            core::sync::atomic::fence(Ordering::SeqCst);
-            debug!("AFTER NOTIFY");
-
-            let mut guard = 0usize;
-            while *((used_base + 2) as *const u16) == last_used {
-                core::sync::atomic::fence(Ordering::SeqCst);
-                guard += 1;
-                if guard % 100000000 == 0 {
-                    let ui = *((used_base + 2) as *const u16);
-                    let ulast = last_used;
-                    debug!("polling used: idx={} last={} guard={}", ui, ulast, guard);
-                }
+            guard += 1;
+            if guard % 100000000 == 0 {
+                debug!(
+                    "polling used: idx={} last={} guard={}",
+                    queue.used.idx, last_used, guard
+                );
             }
-            debug!("DONE polling, guard={}", guard);
         }
+        debug!("DONE polling, guard={}", guard);
 
         let buf_slice =
             unsafe { core::slice::from_raw_parts(addr_of!(DISK_BUF) as *const u8, 512) };
-        debug!(
-            "got data: {}",
-            core::str::from_utf8(buf_slice).unwrap_or("(not utf8)")
-        );
+
+        debug!("buffer: {:?}", buf_slice);
+
+        for i in buf_slice.iter() {
+            print!("{}", *i as char);
+        }
+
+        println!();
     }
 }
 

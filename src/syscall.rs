@@ -1,4 +1,4 @@
-use crate::io::uart::getchar;
+use crate::io::default_init;
 use crate::{print, println};
 
 macro_rules! numeric {
@@ -58,7 +58,12 @@ pub fn handle(a0: u64, a1: u64, a2: u64, _a3: u64, _a4: u64, _a5: u64, _a6: u64,
 
 fn read(_fd: u64, buf: &mut [u8]) -> isize {
     for i in buf.iter_mut() {
-        let ch = getchar() as u8;
+        let ch = if let Some(ch) = crate::io::UART.get_or_init(default_init).lock().getchar() {
+            ch
+        } else {
+            return -1;
+        };
+
         *i = ch;
     }
     0

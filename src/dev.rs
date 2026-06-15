@@ -34,7 +34,6 @@ macro_rules! mmio_regs {
         paste::paste! {
             $( const [<$reg:upper _OFFSET>]: usize = $offset as usize; )+
 
-            // 展开 impl 块
             impl $device {
                 $(
                     $crate::mmio_regs!(@helper &self, $reg, $($t)?, $offset);
@@ -46,7 +45,7 @@ macro_rules! mmio_regs {
     (@helper &self, $reg:ident, $t:ty, $offset:expr) => {
         paste::paste! {
             #[inline]
-            pub fn [< read_ $reg:snake >](&self) -> $t {
+            pub fn [< $reg:snake >](&self) -> $t {
                 self.device.mmio.read::<$t>($offset)
             }
 
@@ -60,7 +59,7 @@ macro_rules! mmio_regs {
     (@helper &self, $reg:ident, , $offset:expr) => {
         paste::paste! {
             #[inline]
-            pub fn [< read_ $reg:snake >]<T>(&self) -> T {
+            pub fn [< $reg:snake >]<T>(&self) -> T {
                 self.device.mmio.read::<T>($offset)
             }
 
@@ -84,10 +83,10 @@ pub fn dev(fdt: &Fdt) {
         };
         let start = i.starting_address as usize;
         let size = i.size.unwrap_or(0);
-        let Some(irqs) = virtio.interrupts() else {
+        let Some(interrupts) = virtio.interrupts() else {
             continue;
         };
-        let Some(irq) = irqs.into_iter().nth(0) else {
+        let Some(irq) = interrupts.into_iter().nth(0) else {
             continue;
         };
 
@@ -100,11 +99,11 @@ pub fn dev(fdt: &Fdt) {
         debug!(
             "address: {:#x}, magic value: {:#x}, device id: {:#x}",
             virtio_blk.device.mmio.start,
-            virtio_blk.read_magic_value(),
-            virtio_blk.read_device_id()
+            virtio_blk.magic_value(),
+            virtio_blk.device_id()
         );
 
-        if virtio_blk.read_device_id() == 0x2 {
+        if virtio_blk.device_id() == 0x2 {
             virtio_blk.print_info().unwrap();
             virtio_blk.test_read();
         }

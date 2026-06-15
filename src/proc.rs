@@ -9,15 +9,6 @@ pub struct PCB {
 }
 
 impl PCB {
-    fn new(pid: u64) -> PCB {
-        PCB {
-            pid,
-            context: [0; 32],
-            sepc: 0,
-            sstatus: 0,
-        }
-    }
-
     fn from(pid: u64, context: *const [u64; 32], sepc: u64, sstatus: u64) -> PCB {
         unsafe {
             PCB {

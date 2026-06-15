@@ -5,6 +5,7 @@ mod dev;
 mod io;
 mod locks;
 mod log;
+mod marco;
 #[cfg(feature = "mem")]
 mod mem;
 mod proc;
@@ -13,8 +14,7 @@ mod trap;
 
 use crate::arch::registers::{ReadableRegister, WritableRegister};
 use crate::arch::sbi::srst::{ResetReason, ResetType, system_reset};
-use crate::io::uart::uart_init;
-use crate::trap::{Exception, Interrupt, Trap};
+use crate::io::uart_init;
 use core::arch::{asm, global_asm};
 use core::panic::PanicInfo;
 
@@ -32,13 +32,6 @@ bits! {
         spp: 8,
         sie: 1
     }
-}
-
-macro_rules! get_tag_address {
-    ($var:ident $(: $t:ty)? = $tag:literal) => {
-        let $var $(: $t)?;
-        unsafe { core::arch::asm!( concat!("la {}, ", $tag), out(reg) $var ) }
-    };
 }
 
 #[inline]
@@ -95,88 +88,53 @@ fn main(_hart_id: usize, dev_tree_address: usize) -> ! {
     let fdt = unsafe { fdt::Fdt::from_ptr(dev_tree_address as *const u8) }.unwrap();
 
     if let Some(uart) = fdt.find_node("/soc/serial") {
-        if let Some(mut regs) = uart.reg() {
-            while let Some(reg) = regs.next() {
-                let r = uart_init(reg.starting_address as u64);
-                if r.is_ok() {
-                    println!(
-                        "[Kernel] UART init, base address: {}",
-                        reg.starting_address as u64
-                    );
-                } else {
-                    system_reset(ResetType::Shutdown, ResetReason::None);
-                }
-            }
-        }
+        let irq = uart.interrupts()
+            .unwrap()
+            .nth(0)
+            .unwrap_or(0);
+
+        let reg = uart.reg().unwrap().nth(0).unwrap();
+
+        uart_init(reg, irq);
+
+        debug!("UART initialized");
     } else {
         system_reset(ResetType::Shutdown, ResetReason::None);
     }
 
     dev::dev(&fdt);
 
-    // into_u_mode();
-    // turn_to_user_program!("user_mode_test");
+    into_u_mode();
+    turn_to_user_program!("user_mode_test");
 
     kernel_do_no_thing()
 }
 
 #[unsafe(no_mangle)]
 fn kernel_do_no_thing() -> ! {
-    println!("[Kernel] do no thing");
-    loop {}
+    debug!("do no thing");
+    loop {
+        core::hint::spin_loop();
+    }
 }
 
 #[panic_handler]
 fn panic_handle(info: &PanicInfo) -> ! {
-    println!("{:#?}", info);
+    if let Some(location) = info.location() {
+        error!(
+            "panic at => {}:{}:{} : {}",
+            location.file(),
+            location.line(),
+            location.column(),
+            info.message()
+        );
+    } else {
+        error!("panic: {}", info.message());
+    }
+
     let _ = system_reset(ResetType::Shutdown, ResetReason::None);
 
-    loop {}
-}
-
-#[unsafe(no_mangle)]
-fn trap_handler(scause: u64, sepc: u64, _stval: u64, _sstatus: u64, trap_frame_sp: u64) {
-    let trap = Trap::from(scause as i64);
-
-    match trap {
-        Trap::Interrupt(Interrupt::SupervisorTimerInterrupt) => {
-            set_time();
-        }
-        Trap::Exception(Exception::UModeEcall) => {
-            let frame = trap_frame_sp as *const u64;
-
-            mem_read!(frame, a0 => 10, a1 => 11, a2 => 12, a3 => 13, a4 => 14, a5 => 15, a6 => 16, a7 => 17);
-
-            let ret = syscall::handle(a0, a1, a2, a3, a4, a5, a6, a7);
-            unsafe { (trap_frame_sp as *mut u64).add(10).write(ret) };
-
-            if a7 == 60 {
-                get_tag_address!(addr: u64 = "kernel_do_no_thing");
-                arch::registers::csr::Sepc::write(addr);
-                let mut s: SStatusBits = arch::registers::csr::Sstatus::read();
-                s.set_spp(true);
-                arch::registers::csr::Sstatus::write(s);
-            } else {
-                arch::registers::csr::Sepc::write(sepc + 4);
-            }
-        }
-        Trap::Exception(Exception::Breakpoint) => {
-            arch::registers::csr::Sepc::write(sepc + 4);
-        }
-        Trap::Exception(Exception::SModeEcall | Exception::MModeEcall) => {
-            arch::registers::csr::Sepc::write(sepc + 4);
-        }
-        Trap::Exception(Exception::IllegalInstruction) => {
-            system_reset(ResetType::Shutdown, ResetReason::None);
-        }
-        Trap::Interrupt(Interrupt::SupervisorExternalInterrupt) => {}
-        Trap::Exception(
-            Exception::LoadAccessFault
-            | Exception::LoadPageFault
-            | Exception::InstructionAccessFault,
-        ) => {
-            system_reset(ResetType::Shutdown, ResetReason::SysFail);
-        }
-        _ => {}
+    loop {
+        core::hint::spin_loop();
     }
 }

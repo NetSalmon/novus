@@ -1,5 +1,5 @@
 use crate::debug;
-use crate::dev::virtio_blk_device::queue::{get_queue_ptr, Queue};
+use crate::dev::virtio_blk_device::queue::{Queue, get_queue_ptr};
 use crate::dev::virtio_blk_device::{
     RING_MAX_SIZE, Status, StatusTrait, VirtioBlk, VirtioBlkFeaturesLow, VirtioBlkFeaturesLowTrait,
     VirtioBlkOperation,
@@ -25,19 +25,37 @@ impl<'a> VirtioBlkOperation for LegacyMode<'a> {
 
         // read features
         self.blk.write_device_features_sel(0);
-        let mut features_low: VirtioBlkFeaturesLow = self.blk.read_device_features();
+        let mut features_low: VirtioBlkFeaturesLow = self.blk.device_features();
         debug!("features_low : {:#b}", features_low);
-        debug!("feature geometry            :   {}", features_low.geometry());
-        debug!("feature readonly            :   {}", features_low.readonly());
+        debug!(
+            "feature geometry            :   {}",
+            features_low.geometry()
+        );
+        debug!(
+            "feature readonly            :   {}",
+            features_low.readonly()
+        );
         debug!("feature scsi                :   {}", features_low.scsi());
         debug!("feature flush               :   {}", features_low.flush());
-        debug!("feature any_layout          :   {}", features_low.any_layout());
-        debug!("feature write_zeroes        :   {}", features_low.write_zeroes());
-        debug!("feature blk_size            :   {}", features_low.blk_size());
-        debug!("feature flush_cmd           :   {}", features_low.flush_cmd());
+        debug!(
+            "feature any_layout          :   {}",
+            features_low.any_layout()
+        );
+        debug!(
+            "feature write_zeroes        :   {}",
+            features_low.write_zeroes()
+        );
+        debug!(
+            "feature blk_size            :   {}",
+            features_low.blk_size()
+        );
+        debug!(
+            "feature flush_cmd           :   {}",
+            features_low.flush_cmd()
+        );
         // read high features
         self.blk.write_device_features_sel(1);
-        let features_high: u32 = self.blk.read_device_features();
+        let features_high: u32 = self.blk.device_features();
         debug!("features_high : {:#b}", features_high);
 
         let mut new_feat: VirtioBlkFeaturesLow = 0;
@@ -48,7 +66,7 @@ impl<'a> VirtioBlkOperation for LegacyMode<'a> {
         self.blk.write_status(status);
 
         // READ BACK CHECK
-        let got_status: Status = self.blk.read_status();
+        let got_status: Status = self.blk.status();
         if !got_status.features_ok() {
             return Err(-2);
         }

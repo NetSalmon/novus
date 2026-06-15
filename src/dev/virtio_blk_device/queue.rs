@@ -1,33 +1,28 @@
 use crate::bits;
 use crate::dev::virtio_blk_device::RING_MAX_SIZE;
 
-static mut RAW_QUEUE: Queue = Queue {
-    desc: VirtioDescTable {
-        data: [VirtioDesc {
-            addr: 0,
-            len: 0,
-            flags: 0,
-            next: 0,
-        }; RING_MAX_SIZE],
-    },
-    avail: VirtioAvail {
-        flags: 0,
-        idx: 0,
-        ring: [0u16; RING_MAX_SIZE],
-    },
-    used: VirtioUsed {
-        flags: 0,
-        idx: 0,
-        ring: [VirtioUsedElem { id: 0, len: 0 }; RING_MAX_SIZE],
-    },
-};
+#[unsafe(link_section = ".bss.queue")]
+static mut QUEUE: Queue = queue_init();
+
+#[inline]
+const fn queue_init() -> Queue {
+    let desc = VirtioDescTable::new();
+    let avail = VirtioAvail::new();
+    let used = VirtioUsed::new();
+
+    Queue { desc, avail, used }
+}
+
+pub fn get_mut<'a>() -> &'a mut Queue {
+    unsafe { &mut *get_queue_mut() }
+}
 
 pub fn get_queue_ptr() -> *const Queue {
-    unsafe { core::ptr::addr_of!(RAW_QUEUE) }
+    unsafe { core::ptr::addr_of!(QUEUE) }
 }
 
 pub fn get_queue_mut() -> *mut Queue {
-    unsafe { core::ptr::addr_of_mut!(RAW_QUEUE) }
+    unsafe { core::ptr::addr_of_mut!(QUEUE) }
 }
 
 bits! {
@@ -59,14 +54,16 @@ pub struct VirtioDescTable {
 }
 
 impl VirtioDescTable {
-    pub fn new() -> Self {
+    #[inline]
+    pub const fn new() -> Self {
         let data = [VirtioDesc::new(); RING_MAX_SIZE];
         Self { data }
     }
 }
 
 impl VirtioDesc {
-    pub fn new() -> VirtioDesc {
+    #[inline]
+    pub const fn new() -> VirtioDesc {
         VirtioDesc {
             addr: 0,
             len: 0,
@@ -84,7 +81,8 @@ pub struct VirtioAvail {
 }
 
 impl VirtioAvail {
-    fn new() -> VirtioAvail {
+    #[inline]
+    pub const fn new() -> VirtioAvail {
         Self {
             flags: 0,
             idx: 0,
@@ -108,7 +106,8 @@ pub struct VirtioUsedElem {
 }
 
 impl VirtioUsedElem {
-    pub fn new() -> Self {
+    #[inline]
+    pub const fn new() -> Self {
         Self { id: 0, len: 0 }
     }
 }
@@ -121,7 +120,8 @@ pub struct VirtioUsed {
 }
 
 impl VirtioUsed {
-    pub fn new() -> Self {
+    #[inline]
+    pub const fn new() -> Self {
         Self {
             flags: 0,
             idx: 0,

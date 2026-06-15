@@ -3,6 +3,13 @@ name = "risc_code"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "risc_code"
+path = "src/main.rs"
+test = false
+doctest = false
+bench = false
+
 [dependencies]
 paste = "1.0.15"
 fdt = "0.1.5"
