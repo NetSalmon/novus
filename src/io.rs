@@ -1,7 +1,7 @@
 use crate::io::uart::get_byte_imm;
 
-pub mod uart;
 pub mod ide;
+pub mod uart;
 
 pub trait FileOperate {
     fn read(&self, buffer: &mut [u8]) -> Result<usize, i32>;

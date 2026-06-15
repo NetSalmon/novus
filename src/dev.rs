@@ -1,14 +1,14 @@
+use crate::dev::virtio_blk_device::VirtioBlk;
+use crate::{debug, println};
 use fdt::Fdt;
-use crate::dev::virtio_blk::VirtioBlk;
-use crate::println;
 
 pub mod ns16550a;
 #[allow(unused)]
-pub mod virtio_blk;
+pub mod virtio_blk_device;
 
 pub struct Resource {
     pub start: usize,
-    pub size : usize
+    pub size: usize,
 }
 
 pub struct Device {
@@ -19,16 +19,12 @@ pub struct Device {
 impl Resource {
     #[inline]
     pub fn read<T>(&self, offset: usize) -> T {
-        unsafe {
-            ((self.start as *const u8).add(offset) as *const T).read_volatile()
-        }
+        unsafe { ((self.start as *const u8).add(offset) as *const T).read_volatile() }
     }
 
     #[inline]
     pub fn write<T>(&self, offset: usize, val: T) {
-        unsafe {
-            ((self.start as *mut u8).add(offset) as *mut T).write_volatile(val)
-        }
+        unsafe { ((self.start as *mut u8).add(offset) as *mut T).write_volatile(val) }
     }
 }
 
@@ -77,28 +73,40 @@ macro_rules! mmio_regs {
 }
 
 pub fn dev(fdt: &Fdt) {
-    println!("1");
-    for virtio in fdt.all_nodes()
-        .filter(|node| {
-                node.compatible()
-                    .map(|c| c.all().any(|c| c == "virtio,mmio"))
-                    .unwrap_or(false)
-            }) {
-
+    for virtio in fdt.all_nodes().filter(|node| {
+        node.compatible()
+            .map(|c| c.all().any(|c| c == "virtio,mmio"))
+            .unwrap_or(false)
+    }) {
         let Some(reg) = virtio.reg() else { continue };
-        let Some(i) = reg.into_iter().nth(0) else { continue };
+        let Some(i) = reg.into_iter().nth(0) else {
+            continue;
+        };
         let start = i.starting_address as usize;
         let size = i.size.unwrap_or(0);
-        let Some(irqs) = virtio.interrupts() else { continue };
-        let Some(irq) = irqs.into_iter().nth(0) else { continue };
+        let Some(irqs) = virtio.interrupts() else {
+            continue;
+        };
+        let Some(irq) = irqs.into_iter().nth(0) else {
+            continue;
+        };
 
-        let dev = Device { mmio: Resource { start, size }, irq };
+        let dev = Device {
+            mmio: Resource { start, size },
+            irq,
+        };
         let mut virtio_blk = VirtioBlk { device: dev };
 
-        println!("[Kernel] address: {:#x}, magic value: {:#x}",
-                 virtio_blk.device.mmio.start, virtio_blk.read_magic_value());
+        debug!(
+            "address: {:#x}, magic value: {:#x}, device id: {:#x}",
+            virtio_blk.device.mmio.start,
+            virtio_blk.read_magic_value(),
+            virtio_blk.read_device_id()
+        );
 
-        virtio_blk.print_info();
-        virtio_blk.test_read();
+        if virtio_blk.read_device_id() == 0x2 {
+            virtio_blk.print_info().unwrap();
+            virtio_blk.test_read();
+        }
     }
 }

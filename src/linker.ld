@@ -36,6 +36,7 @@ SECTIONS
         sbss = .;
         *(.bss .bss.*)
         *(.sbss .sbss.*)
+        *( .bss.queue)
     }
 
     . = ALIGN(4K);

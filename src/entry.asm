@@ -1,5 +1,6 @@
 .section .text.entry
 .global _start
+.balign 4
 _start:
     la sp, boot_stack_top
 
@@ -101,11 +102,18 @@ trap_entry:
 .global boot_stack_lower_bound
 .global user_stack_lower_bound
 boot_stack_lower_bound:
-    .space 4096 * 4
+    .space 4096 * 16
     .global boot_stack_top
 boot_stack_top:
 
 user_stack_lower_bound:
-    .space 4096 * 4
+    .space 4096 * 16
     .global user_stack_top
 user_stack_top:
+
+.section .bss.queue
+.global queue_lower_bound
+queue_lower_bound:
+    .space 4096 * 32
+    .global queue_top
+queue_top:

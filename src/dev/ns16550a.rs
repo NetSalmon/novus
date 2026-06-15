@@ -5,7 +5,7 @@ const NS16550A_REG_RBR_THR: usize = 0;
 const NS16550A_REG_LSR: usize = 5;
 
 pub struct Ns16550a {
-    pub device: Device
+    pub device: Device,
 }
 
 /// bit 0: DR   (Data Ready)

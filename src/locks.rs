@@ -12,16 +12,18 @@ unsafe impl<T: Send> Sync for SpinLock<T> {}
 
 impl<T> SpinLock<T> {
     pub fn new(value: T) -> SpinLock<T> {
-        SpinLock { lock: AtomicBool::new(false), value: UnsafeCell::new(value) }
+        SpinLock {
+            lock: AtomicBool::new(false),
+            value: UnsafeCell::new(value),
+        }
     }
 
     pub fn lock(&self) -> SpinLockGuard<'_, T> {
-        while self.lock.compare_exchange(
-            false,
-            true,
-            Ordering::Acquire,
-            Ordering::Relaxed
-        ).is_err() {
+        while self
+            .lock
+            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+            .is_err()
+        {
             core::hint::spin_loop();
         }
         SpinLockGuard { lock: self }
@@ -67,7 +69,7 @@ impl<T> OnceLock<T> {
     pub const fn new() -> OnceLock<T> {
         OnceLock {
             status: AtomicU8::new(UNINITIALIZED),
-            value: UnsafeCell::new(MaybeUninit::uninit())
+            value: UnsafeCell::new(MaybeUninit::uninit()),
         }
     }
 
@@ -88,7 +90,7 @@ impl<T> OnceLock<T> {
             UNINITIALIZED,
             INITIALIZING,
             Ordering::Acquire,
-            Ordering::Relaxed
+            Ordering::Relaxed,
         ) {
             if current == INITIALIZED {
                 return unsafe { &*(*self.value.get()).as_ptr() };

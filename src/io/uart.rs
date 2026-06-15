@@ -37,7 +37,7 @@ pub fn putchar(c: char) {
 }
 
 pub fn can_write(lsr: *mut u8) -> bool {
-    (unsafe { core::ptr::read_volatile(lsr) } & 0b100000) >> 6 == 0
+    (unsafe { core::ptr::read_volatile(lsr) } & 0b100000) != 0
 }
 
 pub fn can_read(lsr: *mut u8) -> bool {

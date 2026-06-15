@@ -1,21 +1,22 @@
 #![no_std]
 #![no_main]
+mod arch;
+mod dev;
 mod io;
+mod locks;
+mod log;
 #[cfg(feature = "mem")]
 mod mem;
+mod proc;
 mod syscall;
 mod trap;
-mod dev;
-mod arch;
-mod proc;
-mod locks;
 
 use crate::arch::registers::{ReadableRegister, WritableRegister};
-use crate::arch::sbi::srst::{system_reset, ResetReason, ResetType};
+use crate::arch::sbi::srst::{ResetReason, ResetType, system_reset};
+use crate::io::uart::uart_init;
 use crate::trap::{Exception, Interrupt, Trap};
 use core::arch::{asm, global_asm};
 use core::panic::PanicInfo;
-use crate::io::uart::uart_init;
 
 global_asm!(include_str!("entry.asm"));
 
@@ -39,7 +40,6 @@ macro_rules! get_tag_address {
         unsafe { core::arch::asm!( concat!("la {}, ", $tag), out(reg) $var ) }
     };
 }
-
 
 #[inline]
 fn into_u_mode() {
@@ -99,7 +99,10 @@ fn main(_hart_id: usize, dev_tree_address: usize) -> ! {
             while let Some(reg) = regs.next() {
                 let r = uart_init(reg.starting_address as u64);
                 if r.is_ok() {
-                    println!("[Kernel] UART init, base address: {}", reg.starting_address as u64);
+                    println!(
+                        "[Kernel] UART init, base address: {}",
+                        reg.starting_address as u64
+                    );
                 } else {
                     system_reset(ResetType::Shutdown, ResetReason::None);
                 }
@@ -109,30 +112,7 @@ fn main(_hart_id: usize, dev_tree_address: usize) -> ! {
         system_reset(ResetType::Shutdown, ResetReason::None);
     }
 
-    let virtio = fdt.all_nodes().filter(|node| {
-        node.compatible()
-            .map(|comp| comp.all().any(|c| c == "virtio,mmio"))
-            .unwrap_or(false)
-    });
-
-    for node in virtio {
-        println!("[Kernel] VirtIO node: {}", node.name);
-
-        if let Some(regs) = node.reg() {
-            for reg in regs {
-                let base_addr = reg.starting_address as usize;
-                println!("[Kernel] MMIO base address: {:#x}", base_addr);
-            }
-        }
-
-        if let Some(interrupt) = node.interrupts().and_then(|mut i| i.next()) {
-            println!("[Kernel] IRQ: {}", interrupt);
-        }
-    }
-
-    println!("detect device");
     dev::dev(&fdt);
-    println!("detected device");
 
     // into_u_mode();
     // turn_to_user_program!("user_mode_test");
@@ -159,7 +139,9 @@ fn trap_handler(scause: u64, sepc: u64, _stval: u64, _sstatus: u64, trap_frame_s
     let trap = Trap::from(scause as i64);
 
     match trap {
-        Trap::Interrupt(Interrupt::SupervisorTimerInterrupt) => { set_time(); }
+        Trap::Interrupt(Interrupt::SupervisorTimerInterrupt) => {
+            set_time();
+        }
         Trap::Exception(Exception::UModeEcall) => {
             let frame = trap_frame_sp as *const u64;
 
@@ -187,10 +169,12 @@ fn trap_handler(scause: u64, sepc: u64, _stval: u64, _sstatus: u64, trap_frame_s
         Trap::Exception(Exception::IllegalInstruction) => {
             system_reset(ResetType::Shutdown, ResetReason::None);
         }
-        Trap::Interrupt(Interrupt::SupervisorExternalInterrupt) => {
-
-        }
-        Trap::Exception(Exception::LoadAccessFault | Exception::LoadPageFault | Exception::InstructionAccessFault) => {
+        Trap::Interrupt(Interrupt::SupervisorExternalInterrupt) => {}
+        Trap::Exception(
+            Exception::LoadAccessFault
+            | Exception::LoadPageFault
+            | Exception::InstructionAccessFault,
+        ) => {
             system_reset(ResetType::Shutdown, ResetReason::SysFail);
         }
         _ => {}
