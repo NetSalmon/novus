@@ -58,7 +58,7 @@ impl<'a> VirtioBlkOperation for LegacyMode<'a> {
         let features_high: u32 = self.blk.device_features();
         debug!("features_high : {:#b}", features_high);
 
-        let mut new_feat: VirtioBlkFeaturesLow = 0;
+        let new_feat: VirtioBlkFeaturesLow = 0;
         self.blk.write_driver_features_sel(0);
         self.blk.write_driver_features(new_feat);
 

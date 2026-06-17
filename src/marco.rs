@@ -71,3 +71,57 @@ macro_rules! get_tag_address {
         unsafe { core::arch::asm!( concat!("la {}, ", $tag), out(reg) $var ) }
     };
 }
+
+#[macro_export]
+macro_rules! numeric {
+    ($( #[$attr:meta] )* pub enum $name:ident : $t:ty { $( $item:ident = $value:expr ),* $(,)? }) => {
+        $( #[$attr] )*
+        pub enum $name {
+            $( $item ),*
+        }
+
+        impl TryFrom<$t> for $name {
+            type Error = $t;
+
+            fn try_from(value: $t) -> Result<$name, $t> {
+                match value {
+                    $( $value => Ok($name::$item), )*
+                    _ => Err(value)
+                }
+            }
+        }
+
+        impl From<$name> for $t {
+            fn from(value: $name) -> $t {
+                match value {
+                    $( $name::$item => $value, )*
+                }
+            }
+        }
+    };
+    (@fallback $( #[$attr:meta] )* pub enum $name:ident : $t:ty { $( $item:ident = $value:expr ),* $(,)? }) => {
+        $( #[$attr] )*
+        pub enum $name {
+            Reserved($t),
+            $( $item ),*
+        }
+
+        impl From<$t> for $name {
+            fn from(value: $t) -> $name {
+                match value {
+                    $( v if v == $value => $name::$item, )*
+                    _ => $name::Reserved(value)
+                }
+            }
+        }
+
+        impl From<$name> for $t {
+            fn from(value: $name) -> $t {
+                match value {
+                    $name::Reserved(value) => value,
+                    $( $name::$item => $value, )*
+                }
+            }
+        }
+    };
+}

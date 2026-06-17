@@ -1,5 +1,5 @@
 use crate::dev::virtio_blk_device::VirtioBlk;
-use crate::{debug, println};
+use crate::debug;
 use fdt::Fdt;
 
 pub mod ns16550a;
@@ -78,7 +78,7 @@ pub fn dev(fdt: &Fdt) {
             .unwrap_or(false)
     }) {
         let Some(reg) = virtio.reg() else { continue };
-        let Some(i) = reg.into_iter().nth(0) else {
+        let Some(i) = reg.into_iter().next() else {
             continue;
         };
         let start = i.starting_address as usize;
@@ -86,7 +86,7 @@ pub fn dev(fdt: &Fdt) {
         let Some(interrupts) = virtio.interrupts() else {
             continue;
         };
-        let Some(irq) = interrupts.into_iter().nth(0) else {
+        let Some(irq) = interrupts.into_iter().next() else {
             continue;
         };
 

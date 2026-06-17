@@ -90,10 +90,10 @@ fn main(_hart_id: usize, dev_tree_address: usize) -> ! {
     if let Some(uart) = fdt.find_node("/soc/serial") {
         let irq = uart.interrupts()
             .unwrap()
-            .nth(0)
+            .next()
             .unwrap_or(0);
 
-        let reg = uart.reg().unwrap().nth(0).unwrap();
+        let reg = uart.reg().unwrap().next().unwrap();
 
         uart_init(reg, irq);
 

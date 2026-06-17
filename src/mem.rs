@@ -12,6 +12,28 @@ macro_rules! mem_read {
     };
 }
 
+#[macro_export]
+macro_rules! read_as_array {
+    (@base $base:expr, $t:ty, $offset:expr) => {
+        {
+            let offset = $offset;
+            let base = $base as *const $t;
+            unsafe { base.add(offset) }
+        }
+    };
+    (@base $base:expr, $t:ty) => {
+        $base as *const $t
+    };
+    ($var:ident : $t:ty => $base:expr $(, $offset:expr)? => $len:expr) => {
+        let mut $var : [$t; $len] = [0; $len];
+        let base = read_as_array!(@base $base, $t $(, $offset)?);
+
+        for i in 0..$len {
+            $var[i] = unsafe { base.add(i).read() };
+        }
+    };
+}
+
 bits! {
     pub type VirtualAddr : usize {
         page_offset: 0 => 11,

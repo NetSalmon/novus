@@ -1,8 +1,6 @@
 use crate::{bits, mmio_regs};
 use crate::dev::Device;
 
-const NS16550A_REG_LSR: usize = 5;
-
 pub struct Ns16550a {
     pub device: Device,
 }

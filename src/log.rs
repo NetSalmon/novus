@@ -1,5 +1,3 @@
-const ROOT_NAME: &str = "kernel";
-
 #[macro_export]
 macro_rules! debug {
     ($($arg:tt)*) => {

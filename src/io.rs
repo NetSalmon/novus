@@ -20,7 +20,7 @@ pub fn uart_init(reg: MemoryRegion, irq: usize) {
     UART.get_or_init(|| SpinLock::new(ns16550a));
 }
 
-pub fn default_init() -> SpinLock<Ns16550a> {
+pub fn fallback() -> SpinLock<Ns16550a> {
     SpinLock::new(Ns16550a {
         device: Device {
             mmio: Resource {
@@ -42,7 +42,7 @@ impl fmt::Write for Ns16550a {
 
 pub fn _print(args: fmt::Arguments) {
     use fmt::Write;
-    UART.get_or_init(default_init)
+    UART.get_or_init(fallback)
         .lock()
         .write_fmt(args)
         .unwrap();

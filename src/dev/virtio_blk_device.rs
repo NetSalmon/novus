@@ -154,6 +154,7 @@ impl VirtioBlk {
             reserved: 0,
             sector: 0,
         };
+
         let require_addr = unsafe { core::ptr::addr_of_mut!(DISK_STATUS) } as u64;
         static mut DISK_BUF: [u8; 512] = [0u8; 512];
         let buffer_addr = unsafe { core::ptr::addr_of_mut!(DISK_BUF) } as u64;
@@ -217,16 +218,19 @@ impl VirtioBlk {
         debug!("AFTER NOTIFY");
 
         let mut guard = 0usize;
-        while queue.used.idx == last_used {
+        let idx_ptr = &queue.used.idx as *const u16;
+
+        while unsafe { idx_ptr.read_volatile() } == last_used {
             core::sync::atomic::fence(Ordering::SeqCst);
             guard += 1;
-            if guard % 100000000 == 0 {
+            if guard.is_multiple_of(100000000) {
                 debug!(
                     "polling used: idx={} last={} guard={}",
                     queue.used.idx, last_used, guard
                 );
             }
         }
+
         debug!("DONE polling, guard={}", guard);
 
         let buf_slice =
