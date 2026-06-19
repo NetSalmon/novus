@@ -1,6 +1,6 @@
 use crate::arch::registers::{ReadableRegister, WritableRegister};
 use crate::arch::sbi::srst::{ResetReason, ResetType, system_reset};
-use crate::{SStatusBits, SStatusBitsTrait, arch, syscall, get_tag_address, read_as_array, debug, numeric};
+use crate::{SStatusBits, arch, syscall, get_tag_address, read_as_array, debug, numeric};
 
 const INTERRUPT_MASK: i64 = 1 << 63;
 
@@ -97,9 +97,9 @@ fn trap_handler(scause: u64, sepc: u64, _stval: u64, _sstatus: u64, trap_frame_s
             if args[7] == 60 {
                 get_tag_address!(addr: u64 = "kernel_do_no_thing");
                 arch::registers::csr::Sepc::write(addr);
-                let mut s: SStatusBits = arch::registers::csr::Sstatus::read();
+                let mut s: SStatusBits = arch::registers::csr::Sstatus::read().into();
                 s.set_spp(true);
-                arch::registers::csr::Sstatus::write(s);
+                arch::registers::csr::Sstatus::write(s.into());
             } else {
                 arch::registers::csr::Sepc::write(sepc + 4);
             }

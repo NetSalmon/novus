@@ -2,6 +2,7 @@ pub mod legacy;
 pub mod modern;
 pub mod queue;
 
+use core::ops::Deref;
 use crate::dev::Device;
 use crate::dev::virtio_blk_device::legacy::LegacyMode;
 use crate::dev::virtio_blk_device::modern::ModernMode;
@@ -147,7 +148,7 @@ impl VirtioBlk {
 
     pub fn test_read(&self) {
         const VIRTIO_BLK_T_GET_ID: u32 = 8;
-        const NEXT: Flags = 1;
+        const NEXT: Flags = Flags::from(1);
 
         static mut DISK_REQ: VirtioBlkReq = VirtioBlkReq {
             type_: 0,
@@ -155,9 +156,9 @@ impl VirtioBlk {
             sector: 0,
         };
 
-        let require_addr = unsafe { core::ptr::addr_of_mut!(DISK_STATUS) } as u64;
+        let req_addr = unsafe { core::ptr::addr_of_mut!(DISK_REQ) } as u64;
         static mut DISK_BUF: [u8; 512] = [0u8; 512];
-        let buffer_addr = unsafe { core::ptr::addr_of_mut!(DISK_BUF) } as u64;
+        let buf_addr = unsafe { core::ptr::addr_of_mut!(DISK_BUF) } as u64;
         static mut DISK_STATUS: u8 = 0;
         let status_addr = unsafe { core::ptr::addr_of_mut!(DISK_STATUS) } as u64;
 
@@ -177,28 +178,30 @@ impl VirtioBlk {
         let last_used = queue.used.idx;
 
         queue.desc.data[0] = VirtioDesc {
-            addr: require_addr,
+            addr: req_addr,
             len: size_of::<VirtioBlkReq>() as u32,
             flags: NEXT, // NEXT
             next: 1,
         };
 
         queue.desc.data[1] = VirtioDesc {
-            addr: buffer_addr,
+            addr: buf_addr,
             len: 512,
-            flags: 3, // NEXT | WRITE
+            flags: 3.into(), // NEXT | WRITE
             next: 2,
         };
 
         queue.desc.data[2] = VirtioDesc {
             addr: status_addr,
             len: 1,
-            flags: 2, // WRITE
+            flags: 2.into(), // WRITE
             next: 0,
         };
 
         queue.avail.ring[0] = 0;
         queue.avail.idx = 2;
+
+        debug!("{:?}", queue);
 
         core::sync::atomic::fence(Ordering::SeqCst);
 
@@ -208,7 +211,7 @@ impl VirtioBlk {
             queue.avail.ring[0],
             queue.desc.data[0].addr,
             queue.desc.data[0].len,
-            queue.desc.data[0].flags,
+            &queue.desc.data[0].flags.deref(),
             queue.desc.data[0].next,
             queue as *const _ as usize,
         );

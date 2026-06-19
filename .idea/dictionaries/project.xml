@@ -6,11 +6,14 @@
       <w>Shmem</w>
       <w>asid</w>
       <w>ebss</w>
+      <w>edata</w>
       <w>ekernel</w>
       <w>erodata</w>
       <w>etext</w>
       <w>fcsr</w>
       <w>hartid</w>
+      <w>riscv</w>
+      <w>rodata</w>
       <w>sbss</w>
       <w>sfence</w>
       <w>skernel</w>

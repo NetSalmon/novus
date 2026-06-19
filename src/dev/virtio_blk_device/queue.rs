@@ -33,6 +33,7 @@ bits! {
 }
 
 #[repr(C, align(4096))]
+#[derive(Debug)]
 pub struct Queue {
     pub desc: VirtioDescTable,
     pub avail: VirtioAvail,
@@ -49,6 +50,7 @@ pub struct VirtioDesc {
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct VirtioDescTable {
     pub data: [VirtioDesc; RING_MAX_SIZE],
 }
@@ -67,13 +69,14 @@ impl VirtioDesc {
         VirtioDesc {
             addr: 0,
             len: 0,
-            flags: 0,
+            flags: Flags(0),
             next: 0,
         }
     }
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct VirtioAvail {
     pub flags: u16,
     pub idx: u16,
@@ -99,7 +102,7 @@ impl VirtioAvail {
 }
 
 #[repr(C)]
-#[derive(Default, Copy, Clone)]
+#[derive(Default, Copy, Clone, Debug)]
 pub struct VirtioUsedElem {
     pub id: u32,
     pub len: u32,
@@ -113,6 +116,7 @@ impl VirtioUsedElem {
 }
 
 #[repr(C, align(4096))]
+#[derive(Debug)]
 pub struct VirtioUsed {
     pub flags: u16,
     pub idx: u16,

@@ -1,7 +1,6 @@
 mod utils;
 
-use crate::mem::alloc::frame_alloc;
-use crate::mem::{PhysicalAddr, PhysicalAddrTrait, VirtualAddr, VirtualAddrTrait};
+use crate::mem::addr::{PhysicalAddr, PhysicalAddrTrait, VirtualAddr, VirtualAddrTrait};
 use crate::println;
 use crate::registers::WritableRegister;
 use core::arch::asm;
@@ -118,7 +117,7 @@ pub fn enable_sv39(root_pt_pa: PhysicalAddr) {
     rwx_flags.set_d(true);
     rwx_flags.set_v(true);
 
-    for i in (0x8000_0000..0x8100_0000).step_by(4096) {
+    for i in (0x8000_0000..0x8100_0000).step_by(4096 * 3) {
         println!("[Mapping] address: {i:#x}");
         table.map(i, i, rwx_flags);
         table.map(liner_mapping(i), i, rwx_flags);

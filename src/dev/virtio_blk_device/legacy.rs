@@ -1,10 +1,10 @@
 use crate::debug;
 use crate::dev::virtio_blk_device::queue::{Queue, get_queue_ptr};
 use crate::dev::virtio_blk_device::{
-    RING_MAX_SIZE, Status, StatusTrait, VirtioBlk, VirtioBlkFeaturesLow, VirtioBlkFeaturesLowTrait,
+    RING_MAX_SIZE, Status, VirtioBlk, VirtioBlkFeaturesLow,
     VirtioBlkOperation,
 };
-use crate::mem::{PhysicalAddr, PhysicalAddrTrait};
+use crate::mem::addr::{PhysicalAddr};
 
 pub struct LegacyMode<'a> {
     pub blk: &'a VirtioBlk,
@@ -12,21 +12,21 @@ pub struct LegacyMode<'a> {
 impl<'a> VirtioBlkOperation for LegacyMode<'a> {
     type Error = isize;
     fn handshake(&mut self) -> Result<(), Self::Error> {
-        let mut status: Status = 0;
-        self.blk.write_status(status);
+        let mut status: Status = Status::from(0);
+        self.blk.write_status(status.into());
 
         // ACT
         status.set_acknowledge(true);
-        self.blk.write_status(status);
+        self.blk.write_status(status.into());
 
         // DRIVER
         status.set_driver(true);
-        self.blk.write_status(status);
+        self.blk.write_status(status.into());
 
         // read features
         self.blk.write_device_features_sel(0);
-        let mut features_low: VirtioBlkFeaturesLow = self.blk.device_features();
-        debug!("features_low : {:#b}", features_low);
+        let mut features_low: VirtioBlkFeaturesLow = self.blk.device_features().into();
+        debug!("features_low : {:?}", features_low);
         debug!(
             "feature geometry            :   {}",
             features_low.geometry()
@@ -56,17 +56,17 @@ impl<'a> VirtioBlkOperation for LegacyMode<'a> {
         // read high features
         self.blk.write_device_features_sel(1);
         let features_high: u32 = self.blk.device_features();
-        debug!("features_high : {:#b}", features_high);
+        debug!("features_high : {:?}", features_high);
 
-        let new_feat: VirtioBlkFeaturesLow = 0;
+        let new_feat= VirtioBlkFeaturesLow::from(0);
         self.blk.write_driver_features_sel(0);
-        self.blk.write_driver_features(new_feat);
+        self.blk.write_driver_features(new_feat.into());
 
         status.set_features_ok(true);
-        self.blk.write_status(status);
+        self.blk.write_status(status.into());
 
         // READ BACK CHECK
-        let got_status: Status = self.blk.status();
+        let got_status: Status = self.blk.status().into();
         if !got_status.features_ok() {
             return Err(-2);
         }
@@ -80,7 +80,8 @@ impl<'a> VirtioBlkOperation for LegacyMode<'a> {
         // Set guest page size to 4096 (page_shift = 12)
         self.blk.write_guest_page_size(4096);
 
-        let ppn = (queue_addr as PhysicalAddr).ppn();
+        let pa: PhysicalAddr = queue_addr.into();
+        let ppn = pa.ppn();
         debug!(
             "queue_addr: {:#x}, ppn: {:#x}, desc_addr: {:#x}",
             queue_addr, ppn, queue_addr
@@ -88,7 +89,7 @@ impl<'a> VirtioBlkOperation for LegacyMode<'a> {
         self.blk.write_queue_pfn(ppn as u32);
 
         status.set_driver_ok(true);
-        self.blk.write_status(status);
+        self.blk.write_status(status.into());
 
         debug!("handshake ok");
 

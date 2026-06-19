@@ -6,17 +6,17 @@ mod io;
 mod locks;
 mod log;
 mod marco;
-#[cfg(feature = "mem")]
 mod mem;
-mod proc;
 mod syscall;
 mod trap;
+mod error;
 
 use crate::arch::registers::{ReadableRegister, WritableRegister};
 use crate::arch::sbi::srst::{ResetReason, ResetType, system_reset};
 use crate::io::uart_init;
 use core::arch::{asm, global_asm};
 use core::panic::PanicInfo;
+use crate::mem::{init_memory, memory};
 
 global_asm!(include_str!("entry.asm"));
 
@@ -36,9 +36,9 @@ bits! {
 
 #[inline]
 fn into_u_mode() {
-    let mut sstatus: SStatusBits = arch::registers::csr::Sstatus::read();
+    let mut sstatus: SStatusBits = arch::registers::csr::Sstatus::read().into();
     sstatus.set_spp(false);
-    arch::registers::csr::Sstatus::write(sstatus);
+    arch::registers::csr::Sstatus::write(sstatus.into());
 
     get_tag_address!(stack: u64 = "user_stack_top");
     arch::registers::gpr::Sp::write(stack);
@@ -101,6 +101,12 @@ fn main(_hart_id: usize, dev_tree_address: usize) -> ! {
     } else {
         system_reset(ResetType::Shutdown, ResetReason::None);
     }
+
+    init_memory(&fdt);
+    println!("{:#x?}", memory());
+
+    unsafe extern "C" { fn _end(); }
+    debug!("end: {:#x}", _end as *const () as usize);
 
     dev::dev(&fdt);
 

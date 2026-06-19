@@ -1,7 +1,7 @@
 use crate::debug;
 use crate::dev::virtio_blk_device::{
-    RING_MAX_SIZE, Status, StatusTrait, VirtioBlk, VirtioBlkFeaturesHigh,
-    VirtioBlkFeaturesHighTrait, VirtioBlkFeaturesLow, VirtioBlkFeaturesLowTrait,
+    RING_MAX_SIZE, Status, VirtioBlk, VirtioBlkFeaturesHigh,
+    VirtioBlkFeaturesLow
 };
 
 use crate::dev::virtio_blk_device::queue::{
@@ -16,45 +16,45 @@ pub struct ModernMode<'a> {
 impl<'a> VirtioBlkOperation for ModernMode<'a> {
     type Error = isize;
     fn handshake(&mut self) -> Result<(), Self::Error> {
-        let mut status: Status = 0;
-        self.blk.write_status(status);
+        let mut status: Status = 0.into();
+        self.blk.write_status(status.into());
 
         // ACT
         status.set_acknowledge(true);
-        self.blk.write_status(status);
+        self.blk.write_status(status.into());
 
         // DRIVER
         status.set_driver(true);
-        self.blk.write_status(status);
+        self.blk.write_status(status.into());
 
         // read features LOW
         self.blk.write_device_features_sel(0);
-        let mut features_low: VirtioBlkFeaturesLow = self.blk.device_features();
-        debug!("features_low : {:#b}", features_low);
+        let mut features_low: VirtioBlkFeaturesLow = self.blk.device_features().into();
+        debug!("features_low : {:?}", features_low);
         self.blk.write_driver_features_sel(0);
         features_low.set_readonly(false);
-        self.blk.write_driver_features(features_low);
+        self.blk.write_driver_features(features_low.into());
 
         // read features HIGH
         self.blk.write_device_features_sel(1);
-        let mut features_high: VirtioBlkFeaturesHigh = self.blk.device_features();
-        debug!("features_high: {:#b}", features_high);
+        let mut features_high: VirtioBlkFeaturesHigh = self.blk.device_features().into();
+        debug!("features_high: {:?}", features_high);
 
         if !features_high.version_1() {
             return Err(-1);
         }
 
         self.blk.write_driver_features_sel(1);
-        features_high = 0;
+        features_high = VirtioBlkFeaturesHigh(0);
         features_high.set_version_1(true);
-        self.blk.write_driver_features(features_high);
+        self.blk.write_driver_features(features_high.into());
 
         // FEATURES_OK
         status.set_features_ok(true);
-        self.blk.write_status(status);
+        self.blk.write_status(status.into());
 
         // READ BACK CHECK
-        let got_status: Status = self.blk.status();
+        let got_status: Status = self.blk.status().into();
         if !got_status.features_ok() {
             return Err(-2);
         }
@@ -78,7 +78,7 @@ impl<'a> VirtioBlkOperation for ModernMode<'a> {
 
         // DRIVER_OK
         status.set_driver_ok(true);
-        self.blk.write_status(status);
+        self.blk.write_status(status.into());
 
         debug!("handshake ok");
 

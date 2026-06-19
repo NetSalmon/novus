@@ -1,54 +1,54 @@
-use crate::bits;
+use fdt::Fdt;
+use crate::error::Error;
+use crate::locks::OnceLock;
 
-#[cfg(feature = "alloc")]
-pub mod alloc;
 #[cfg(feature = "page_table")]
 pub mod page_table;
+pub mod addr;
+pub mod page_alloc;
 
-#[macro_export]
-macro_rules! mem_read {
-    ($base:expr, $($var:ident $(: $t:ty)? => $offset:expr),+$(,)?) => {
-        $( let $var $(: $t)? = unsafe { $base.add($offset).read() }; )+
-    };
+pub static MEMORY: OnceLock<Memory> = OnceLock::new();
+const PAGE_SIZE: usize = 4096;
+
+#[derive(Debug)]
+pub struct Memory {
+    pub start: usize,
+    pub size: usize,
 }
 
-#[macro_export]
-macro_rules! read_as_array {
-    (@base $base:expr, $t:ty, $offset:expr) => {
-        {
-            let offset = $offset;
-            let base = $base as *const $t;
-            unsafe { base.add(offset) }
-        }
-    };
-    (@base $base:expr, $t:ty) => {
-        $base as *const $t
-    };
-    ($var:ident : $t:ty => $base:expr $(, $offset:expr)? => $len:expr) => {
-        let mut $var : [$t; $len] = [0; $len];
-        let base = read_as_array!(@base $base, $t $(, $offset)?);
+impl Memory {
+    pub fn from_fdt(fdt: &Fdt) -> Result<Self, Error> {
+        let range = fdt.find_node("/memory")
+            .ok_or(Error::MemoryNotFound)?
+            .reg()
+            .ok_or(Error::MemoryRegNotFound)?
+            .next()
+            .ok_or(Error::MemoryRangeNotFound)?;
+        let start = range.starting_address as usize;
+        let size = range.size.ok_or(Error::MemorySizeNotFound)?;
 
-        for i in 0..$len {
-            $var[i] = unsafe { base.add(i).read() };
-        }
-    };
-}
+        Ok(Self { start, size })
+    }
 
-bits! {
-    pub type VirtualAddr : usize {
-        page_offset: 0 => 11,
-        vpn0: 12 => 20,
-        vpn1: 21 => 29,
-        vpn2: 30 => 38,
+    pub const fn fallback() -> Self {
+        Self { start: 0x80000000 , size: 0x8000000 } // QEMU
     }
 }
 
-bits! {
-    pub type PhysicalAddr : usize {
-        page_offset: 0 => 11,
-        ppn0: 12 => 20,
-        ppn1: 21 => 29,
-        ppn2: 30 => 55,
-        ppn: 12 => 55,
+pub fn init_memory(fdt: &Fdt) {
+    MEMORY.get_or_init(|| { Memory::from_fdt(fdt).unwrap_or(Memory::fallback()) });
+}
+
+pub fn memory<'a>() -> &'a Memory {
+    MEMORY.get_or_init(Memory::fallback)
+}
+
+#[inline]
+pub fn address_align(addr: usize, align: usize) -> usize {
+    let mode = addr % align;
+    if mode == 0 {
+        addr
+    } else {
+        addr + ( align - mode )
     }
 }

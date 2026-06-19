@@ -1,4 +1,4 @@
-use core::cell::UnsafeCell;
+use core::cell::{UnsafeCell, Cell};
 use core::mem::MaybeUninit;
 use core::ops::{Deref, DerefMut};
 use core::sync::atomic::{AtomicBool, AtomicU8, Ordering};
@@ -118,5 +118,31 @@ impl<T> Drop for OnceLock<T> {
                 self.value.get_mut().assume_init_drop();
             }
         }
+    }
+}
+
+pub struct LazyLock<T, F = fn() -> T> {
+    cell: OnceLock<T>,
+    init: Cell<Option<F>>,
+}
+
+unsafe impl<T, F: Send> Sync for LazyLock<T, F> {}
+
+impl<T, F: FnOnce() -> T> LazyLock<T, F> {
+    pub const fn new(f: F) -> Self {
+        Self { cell: OnceLock::new(), init: Cell::new(Some(f)) }
+    }
+    pub fn force(&self) -> &T {
+        self.cell.get_or_init(|| {
+            let f = self.init.take().unwrap();
+            f()
+        })
+    }
+}
+
+impl<T, F: FnOnce() -> T> Deref for LazyLock<T, F> {
+    type Target = T;
+    fn deref(&self) -> &T {
+        self.force()
     }
 }

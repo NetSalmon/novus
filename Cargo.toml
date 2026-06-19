@@ -16,7 +16,5 @@ fdt = "0.1.5"
 log = "0.4.32"
 
 [features]
-default = [ "mem" ]
 alloc = []
-page_table = [ "alloc", "mem" ]
-mem = [ ]
+page_table = [ "alloc" ]

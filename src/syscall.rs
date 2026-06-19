@@ -1,5 +1,6 @@
-use crate::io::fallback;
-use crate::{numeric, print, println};
+pub mod func;
+
+use crate::{numeric, println};
 
 numeric! {
     pub enum Syscall: u64 {
@@ -14,38 +15,17 @@ pub fn handle(args: [u64;8]) -> u64 {
         Syscall::Read => {
             let ptr = args[1] as *mut u8;
             let buf = core::ptr::slice_from_raw_parts_mut(ptr, args[2] as usize);
-            read(args[0], unsafe { &mut *buf }) as u64
+            func::read(args[0], unsafe { &mut *buf }) as u64
         }
         Syscall::Write => {
             let ptr = args[1] as *mut u8;
             let buf = core::ptr::slice_from_raw_parts_mut(ptr, args[2] as usize);
             let buf = unsafe { &*buf };
-            write(args[0], buf) as u64
+            func::write(args[0], buf) as u64
         }
         Syscall::Exit => {
             println!("[Kernel] user program exit, code: {}", args[0] as i32);
             args[0]
         }
     }
-}
-
-fn read(_fd: u64, buf: &mut [u8]) -> isize {
-    for i in buf.iter_mut() {
-        let ch = if let Some(ch) = crate::io::UART.get_or_init(fallback).lock().getchar() {
-            ch
-        } else {
-            return -1;
-        };
-
-        *i = ch;
-    }
-    0
-}
-
-fn write(_fd: u64, buf: &[u8]) -> isize {
-    for i in buf.iter() {
-        let i = *i as char;
-        print!("{}", i);
-    }
-    0
 }
