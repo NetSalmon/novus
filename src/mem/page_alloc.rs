@@ -1,5 +1,4 @@
 use core::alloc::{GlobalAlloc, Layout};
-use crate::{debug};
 use crate::locks::{LazyLock, SpinLock};
 use crate::mem::{memory, PAGE_SIZE};
 
@@ -30,8 +29,6 @@ impl FrameAllocator {
     }
 
     pub fn allocate_frame(&mut self, pages: usize) -> Option<usize> {
-        debug!("require pages: {}", pages);
-
         let mut start = None;
         let mut prev_bit: bool = (self.table[0] & 1) == 1;
 
@@ -111,12 +108,10 @@ impl FrameAllocator {
 
 unsafe impl GlobalAlloc for LazyLock<SpinLock<FrameAllocator>> {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        debug!("Allocate page for {:#x} bytes", layout.size());
         self.force().lock().allocate_frame(align_up(layout.size())).unwrap() as *mut u8
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        debug!("Deallocate page for {:#x} bytes", layout.size());
         self.force().lock().deallocate_frame(ptr as usize, align_up(layout.size()));
     }
 }

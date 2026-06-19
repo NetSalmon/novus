@@ -1,5 +1,5 @@
 use crate::bits;
-use crate::dev::virtio_blk_device::RING_MAX_SIZE;
+use crate::dev::virtio_blk::RING_MAX_SIZE;
 
 #[unsafe(link_section = ".bss.queue")]
 static mut QUEUE: Queue = queue_init();
@@ -18,11 +18,11 @@ pub fn get_mut<'a>() -> &'a mut Queue {
 }
 
 pub fn get_queue_ptr() -> *const Queue {
-    unsafe { core::ptr::addr_of!(QUEUE) }
+    core::ptr::addr_of!(QUEUE)
 }
 
 pub fn get_queue_mut() -> *mut Queue {
-    unsafe { core::ptr::addr_of_mut!(QUEUE) }
+    core::ptr::addr_of_mut!(QUEUE)
 }
 
 bits! {

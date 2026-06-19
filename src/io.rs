@@ -1,40 +1,10 @@
-use crate::dev::ns16550a::Ns16550a;
-use crate::dev::{Device, Resource};
-use crate::locks::{OnceLock, SpinLock};
+use crate::dev::ns16550a::{Ns16550a, uart};
 use core::fmt;
-use fdt::standard_nodes::MemoryRegion;
 
-pub static UART: OnceLock<SpinLock<Ns16550a>> = OnceLock::new();
-
-pub fn uart_init(reg: MemoryRegion, irq: usize) {
-    let start = reg.starting_address as usize;
-    let size = reg.size.unwrap_or(0);
-
-    let ns16550a = Ns16550a {
-        device: Device {
-            mmio: Resource { start, size },
-            irq,
-        },
-    };
-
-    UART.get_or_init(|| SpinLock::new(ns16550a));
-}
-
-pub fn fallback() -> SpinLock<Ns16550a> {
-    SpinLock::new(Ns16550a {
-        device: Device {
-            mmio: Resource {
-                start: 0x0010000000,
-                size: 0x100,
-            },
-            irq: 0x0a,
-        },
-    })
-}
 impl fmt::Write for Ns16550a {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        for c in s.chars() {
-            self.putchar(c as u8);
+        for c in s.bytes() {
+            self.putchar(c);
         }
         Ok(())
     }
@@ -42,10 +12,7 @@ impl fmt::Write for Ns16550a {
 
 pub fn _print(args: fmt::Arguments) {
     use fmt::Write;
-    UART.get_or_init(fallback)
-        .lock()
-        .write_fmt(args)
-        .unwrap();
+    let _ = uart().lock().write_fmt(args);
 }
 
 #[macro_export]
@@ -57,10 +24,6 @@ macro_rules! print {
 
 #[macro_export]
 macro_rules! println {
-    () => {
-        $crate::print!("\n");
-    };
-    ($($arg:tt)*) => {
-        $crate::print!("{}\n", format_args!($($arg)*));
-    };
+    () => { $crate::print!("\n"); };
+    ($($arg:tt)*) => { $crate::print!("{}\n", format_args!($($arg)*)); };
 }

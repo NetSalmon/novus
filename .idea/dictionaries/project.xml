@@ -12,6 +12,7 @@
       <w>etext</w>
       <w>fcsr</w>
       <w>hartid</w>
+      <w>netsalmon</w>
       <w>riscv</w>
       <w>rodata</w>
       <w>sbss</w>

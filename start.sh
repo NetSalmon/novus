@@ -1,7 +1,7 @@
 #!/usr/bin/bash
 
 riscv64-elf-objcopy -O binary \
-    target/riscv64gc-unknown-none-elf/release/risc_code \
+    target/riscv64gc-unknown-none-elf/release/novus \
     target/riscv64gc-unknown-none-elf/release/os.bin
 
 QEMU_ARGS=(

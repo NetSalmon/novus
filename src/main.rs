@@ -13,7 +13,7 @@ mod error;
 
 use crate::arch::registers::{ReadableRegister, WritableRegister};
 use crate::arch::sbi::srst::{ResetReason, ResetType, system_reset};
-use crate::io::uart_init;
+use crate::dev::ns16550a::init as uart_init;
 use core::arch::{asm, global_asm};
 use core::panic::PanicInfo;
 use crate::mem::{init_memory, memory};
@@ -108,7 +108,7 @@ fn main(_hart_id: usize, dev_tree_address: usize) -> ! {
     unsafe extern "C" { fn _end(); }
     debug!("end: {:#x}", _end as *const () as usize);
 
-    dev::dev(&fdt);
+    dev::virtio_blk::probe(&fdt);
 
     into_u_mode();
     turn_to_user_program!("user_mode_test");

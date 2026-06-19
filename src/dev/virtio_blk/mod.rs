@@ -3,15 +3,16 @@ pub mod modern;
 pub mod queue;
 
 use core::ops::Deref;
-use crate::dev::Device;
-use crate::dev::virtio_blk_device::legacy::LegacyMode;
-use crate::dev::virtio_blk_device::modern::ModernMode;
-use crate::dev::virtio_blk_device::queue::{
-    Flags, Queue, VirtioAvail, VirtioDesc, VirtioDescTable, VirtioUsed, get_mut, get_queue_mut,
-};
-use crate::{bits, debug, error, info, mmio_regs, print, println};
 use core::ptr::addr_of;
 use core::sync::atomic::Ordering;
+use crate::dev::{Device, Resource};
+use crate::dev::virtio_blk::legacy::handshake_legacy;
+use crate::dev::virtio_blk::modern::handshake_modern;
+use crate::dev::virtio_blk::queue::{
+    Flags, VirtioDesc, get_mut,
+};
+use crate::{bits, debug, mmio_regs, print, println};
+use fdt::Fdt;
 
 pub struct VirtioBlk {
     pub device: Device,
@@ -89,24 +90,17 @@ bits! {
     }
 }
 
-trait VirtioBlkOperation {
-    type Error;
-    fn handshake(&mut self) -> Result<(), Self::Error>;
-}
-
 const VIRTIO_VERSION_LEGACY: u32 = 1;
 
 impl VirtioBlk {
     pub fn handshake(&mut self) -> Result<(), isize> {
         if self.version() != VIRTIO_VERSION_LEGACY {
-            Ok(ModernMode { blk: self }.handshake()?)
+            handshake_modern(self)
         } else {
-            Ok(LegacyMode { blk: self }.handshake()?)
+            handshake_legacy(self)
         }
     }
-}
 
-impl VirtioBlk {
     pub fn from(dev: Device) -> VirtioBlk {
         VirtioBlk { device: dev }
     }
@@ -156,11 +150,11 @@ impl VirtioBlk {
             sector: 0,
         };
 
-        let req_addr = unsafe { core::ptr::addr_of_mut!(DISK_REQ) } as u64;
+        let req_addr = core::ptr::addr_of_mut!(DISK_REQ) as u64;
         static mut DISK_BUF: [u8; 512] = [0u8; 512];
-        let buf_addr = unsafe { core::ptr::addr_of_mut!(DISK_BUF) } as u64;
+        let buf_addr = core::ptr::addr_of_mut!(DISK_BUF) as u64;
         static mut DISK_STATUS: u8 = 0;
-        let status_addr = unsafe { core::ptr::addr_of_mut!(DISK_STATUS) } as u64;
+        let status_addr = core::ptr::addr_of_mut!(DISK_STATUS) as u64;
 
         unsafe {
             core::ptr::write(
@@ -257,4 +251,33 @@ struct VirtioBlkReq {
     type_: u32,
     reserved: u32,
     sector: u64,
+}
+
+pub fn probe(fdt: &Fdt) {
+    for virtio in fdt.all_nodes().filter(|node| {
+        node.compatible()
+            .map(|c| c.all().any(|c| c == "virtio,mmio"))
+            .unwrap_or(false)
+    }) {
+        let Some(reg) = virtio.reg() else { continue };
+        let Some(i) = reg.into_iter().next() else { continue };
+        let start = i.starting_address as usize;
+        let size = i.size.unwrap_or(0);
+        let Some(interrupts) = virtio.interrupts() else { continue };
+        let Some(irq) = interrupts.into_iter().next() else { continue };
+
+        let mut blk = VirtioBlk {
+            device: Device { mmio: Resource { start, size }, irq },
+        };
+
+        debug!(
+            "address: {:#x}, magic value: {:#x}, device id: {:#x}",
+            blk.device.mmio.start, blk.magic_value(), blk.device_id()
+        );
+
+        if blk.device_id() == 0x2 {
+            blk.print_info().unwrap();
+            blk.test_read();
+        }
+    }
 }

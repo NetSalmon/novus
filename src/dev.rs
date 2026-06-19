@@ -1,10 +1,5 @@
-use crate::dev::virtio_blk_device::VirtioBlk;
-use crate::debug;
-use fdt::Fdt;
-
 pub mod ns16550a;
-#[allow(unused)]
-pub mod virtio_blk_device;
+pub mod virtio_blk;
 
 pub struct Resource {
     pub start: usize,
@@ -69,43 +64,4 @@ macro_rules! mmio_regs {
             }
         }
     };
-}
-
-pub fn dev(fdt: &Fdt) {
-    for virtio in fdt.all_nodes().filter(|node| {
-        node.compatible()
-            .map(|c| c.all().any(|c| c == "virtio,mmio"))
-            .unwrap_or(false)
-    }) {
-        let Some(reg) = virtio.reg() else { continue };
-        let Some(i) = reg.into_iter().next() else {
-            continue;
-        };
-        let start = i.starting_address as usize;
-        let size = i.size.unwrap_or(0);
-        let Some(interrupts) = virtio.interrupts() else {
-            continue;
-        };
-        let Some(irq) = interrupts.into_iter().next() else {
-            continue;
-        };
-
-        let dev = Device {
-            mmio: Resource { start, size },
-            irq,
-        };
-        let mut virtio_blk = VirtioBlk { device: dev };
-
-        debug!(
-            "address: {:#x}, magic value: {:#x}, device id: {:#x}",
-            virtio_blk.device.mmio.start,
-            virtio_blk.magic_value(),
-            virtio_blk.device_id()
-        );
-
-        if virtio_blk.device_id() == 0x2 {
-            virtio_blk.print_info().unwrap();
-            virtio_blk.test_read();
-        }
-    }
 }

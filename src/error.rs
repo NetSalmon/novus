@@ -4,6 +4,4 @@ pub enum Error {
     MemoryRegNotFound,
     MemorySizeNotFound,
     MemoryRangeNotFound,
-    MemoryNotEnough,
-    DiskHandshakeException,
 }
