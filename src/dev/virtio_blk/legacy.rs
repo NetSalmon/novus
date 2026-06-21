@@ -1,8 +1,6 @@
 use crate::debug;
-use crate::dev::virtio_blk::queue::{get_queue_ptr};
-use crate::dev::virtio_blk::{
-    RING_MAX_SIZE, Status, VirtioBlk, VirtioBlkFeaturesLow,
-};
+use crate::dev::virtio_blk::queue::get_queue_ptr;
+use crate::dev::virtio_blk::{RING_MAX_SIZE, Status, VirtioBlk, VirtioBlkFeaturesLow};
 use crate::mem::addr::PhysicalAddr;
 
 pub fn handshake_legacy(blk: &VirtioBlk) -> Result<(), isize> {

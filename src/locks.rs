@@ -1,4 +1,4 @@
-use core::cell::{UnsafeCell, Cell};
+use core::cell::{Cell, UnsafeCell};
 use core::mem::MaybeUninit;
 use core::ops::{Deref, DerefMut};
 use core::sync::atomic::{AtomicBool, AtomicU8, Ordering};
@@ -11,7 +11,7 @@ pub struct SpinLock<T> {
 unsafe impl<T: Send> Sync for SpinLock<T> {}
 
 impl<T> SpinLock<T> {
-    pub fn new(value: T) -> SpinLock<T> {
+    pub const fn new(value: T) -> SpinLock<T> {
         SpinLock {
             lock: AtomicBool::new(false),
             value: UnsafeCell::new(value),
@@ -130,7 +130,10 @@ unsafe impl<T, F: Send> Sync for LazyLock<T, F> {}
 
 impl<T, F: FnOnce() -> T> LazyLock<T, F> {
     pub const fn new(f: F) -> Self {
-        Self { cell: OnceLock::new(), init: Cell::new(Some(f)) }
+        Self {
+            cell: OnceLock::new(),
+            init: Cell::new(Some(f)),
+        }
     }
     pub fn force(&self) -> &T {
         self.cell.get_or_init(|| {

@@ -2,16 +2,14 @@ pub mod legacy;
 pub mod modern;
 pub mod queue;
 
+use crate::dev::virtio_blk::legacy::handshake_legacy;
+use crate::dev::virtio_blk::modern::handshake_modern;
+use crate::dev::virtio_blk::queue::{Flags, VirtioDesc, get_mut};
+use crate::dev::{Device, Resource};
+use crate::{bits, debug, mmio_regs, print, println};
 use core::ops::Deref;
 use core::ptr::addr_of;
 use core::sync::atomic::Ordering;
-use crate::dev::{Device, Resource};
-use crate::dev::virtio_blk::legacy::handshake_legacy;
-use crate::dev::virtio_blk::modern::handshake_modern;
-use crate::dev::virtio_blk::queue::{
-    Flags, VirtioDesc, get_mut,
-};
-use crate::{bits, debug, mmio_regs, print, println};
 use fdt::Fdt;
 
 pub struct VirtioBlk {
@@ -93,6 +91,28 @@ bits! {
 const VIRTIO_VERSION_LEGACY: u32 = 1;
 
 impl VirtioBlk {
+    pub fn probe(fdt: &Fdt) -> Option<Self> {
+        let virtio = fdt.all_nodes().find(|node| {
+            node.compatible()
+                .map(|c| c.all().any(|c| c == "virtio,mmio"))
+                .unwrap_or(false)
+        })?;
+
+        let reg = virtio.reg()?;
+        let i = reg.into_iter().next()?;
+        let start = i.starting_address as usize;
+        let size = i.size.unwrap_or(0);
+        let interrupts = virtio.interrupts()?;
+        let irq = interrupts.into_iter().next()?;
+
+        Some(VirtioBlk {
+            device: Device {
+                mmio: Resource::new(start, size),
+                irq: Some(irq),
+            },
+        })
+    }
+
     pub fn handshake(&mut self) -> Result<(), isize> {
         if self.version() != VIRTIO_VERSION_LEGACY {
             handshake_modern(self)
@@ -140,7 +160,7 @@ impl VirtioBlk {
         Ok(())
     }
 
-    pub fn test_read(&self) {
+    pub unsafe fn test_read(&self) {
         const VIRTIO_BLK_T_GET_ID: u32 = 8;
         const NEXT: Flags = Flags::from(1);
 
@@ -251,33 +271,4 @@ struct VirtioBlkReq {
     type_: u32,
     reserved: u32,
     sector: u64,
-}
-
-pub fn probe(fdt: &Fdt) {
-    for virtio in fdt.all_nodes().filter(|node| {
-        node.compatible()
-            .map(|c| c.all().any(|c| c == "virtio,mmio"))
-            .unwrap_or(false)
-    }) {
-        let Some(reg) = virtio.reg() else { continue };
-        let Some(i) = reg.into_iter().next() else { continue };
-        let start = i.starting_address as usize;
-        let size = i.size.unwrap_or(0);
-        let Some(interrupts) = virtio.interrupts() else { continue };
-        let Some(irq) = interrupts.into_iter().next() else { continue };
-
-        let mut blk = VirtioBlk {
-            device: Device { mmio: Resource { start, size }, irq },
-        };
-
-        debug!(
-            "address: {:#x}, magic value: {:#x}, device id: {:#x}",
-            blk.device.mmio.start, blk.magic_value(), blk.device_id()
-        );
-
-        if blk.device_id() == 0x2 {
-            blk.print_info().unwrap();
-            blk.test_read();
-        }
-    }
 }

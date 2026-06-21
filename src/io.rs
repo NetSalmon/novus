@@ -1,4 +1,5 @@
-use crate::dev::ns16550a::{Ns16550a, uart};
+use crate::dev::ns16550a::Ns16550a;
+use crate::dev::DEV_TREE;
 use core::fmt;
 
 impl fmt::Write for Ns16550a {
@@ -12,7 +13,9 @@ impl fmt::Write for Ns16550a {
 
 pub fn _print(args: fmt::Arguments) {
     use fmt::Write;
-    let _ = uart().lock().write_fmt(args);
+    if let Some(uart) = DEV_TREE.force().ns16550a.as_ref() {
+        let _ = uart.lock().write_fmt(args);
+    }
 }
 
 #[macro_export]

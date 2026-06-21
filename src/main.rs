@@ -2,6 +2,7 @@
 #![no_main]
 mod arch;
 mod dev;
+mod error;
 mod io;
 mod locks;
 mod log;
@@ -9,23 +10,17 @@ mod marco;
 mod mem;
 mod syscall;
 mod trap;
-mod error;
 
 use crate::arch::registers::{ReadableRegister, WritableRegister};
 use crate::arch::sbi::srst::{ResetReason, ResetType, system_reset};
-use crate::dev::ns16550a::init as uart_init;
+use crate::dev::DEV_TREE;
 use core::arch::{asm, global_asm};
 use core::panic::PanicInfo;
-use crate::mem::{init_memory, memory};
+use core::sync::atomic::{AtomicUsize, Ordering};
 
 global_asm!(include_str!("entry.asm"));
 
-#[inline]
-fn set_time() {
-    const GAP: u64 = 1_000_000; // 10 Hz
-    let t = arch::registers::csr::Time::read();
-    arch::registers::csr::Stimecmp::write(t + GAP);
-}
+pub static FDT_ADDRESS: AtomicUsize = AtomicUsize::new(0);
 
 bits! {
     pub type SStatusBits: u64 {
@@ -83,32 +78,7 @@ fn user_mode_test() {
 
 #[unsafe(no_mangle)]
 fn main(_hart_id: usize, dev_tree_address: usize) -> ! {
-    set_time();
-
-    let fdt = unsafe { fdt::Fdt::from_ptr(dev_tree_address as *const u8) }.unwrap();
-
-    if let Some(uart) = fdt.find_node("/soc/serial") {
-        let irq = uart.interrupts()
-            .unwrap()
-            .next()
-            .unwrap_or(0);
-
-        let reg = uart.reg().unwrap().next().unwrap();
-
-        uart_init(reg, irq);
-
-        debug!("UART initialized");
-    } else {
-        system_reset(ResetType::Shutdown, ResetReason::None);
-    }
-
-    init_memory(&fdt);
-    println!("{:#x?}", memory());
-
-    unsafe extern "C" { fn _end(); }
-    debug!("end: {:#x}", _end as *const () as usize);
-
-    dev::virtio_blk::probe(&fdt);
+    FDT_ADDRESS.swap(dev_tree_address, Ordering::Relaxed);
 
     into_u_mode();
     turn_to_user_program!("user_mode_test");

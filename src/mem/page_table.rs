@@ -1,11 +1,8 @@
-mod utils;
-
 use crate::mem::addr::{PhysicalAddr, PhysicalAddrTrait, VirtualAddr, VirtualAddrTrait};
 use crate::println;
 use crate::registers::WritableRegister;
 use core::arch::asm;
 use paste::paste;
-use utils::*;
 
 bits! {
     pub type PTE : u64 {

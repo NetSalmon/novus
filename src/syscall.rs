@@ -1,3 +1,4 @@
+use crate::dev::DEV_TREE;
 use crate::{numeric, print, println};
 
 numeric! {
@@ -9,8 +10,12 @@ numeric! {
 }
 
 fn read(_fd: u64, buf: &mut [u8]) -> isize {
+    let uart = match DEV_TREE.force().ns16550a.as_ref() {
+        Some(u) => u,
+        None => return -1,
+    };
     for i in buf.iter_mut() {
-        let ch = if let Some(ch) = crate::dev::ns16550a::uart().lock().getchar() {
+        let ch = if let Some(ch) = uart.lock().getchar() {
             ch
         } else {
             return -1;

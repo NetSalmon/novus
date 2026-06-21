@@ -83,7 +83,6 @@ macro_rules! bits {
     };
 }
 
-
 #[macro_export]
 macro_rules! get_tag_address {
     ($var:ident $(: $t:ty)? = $tag:literal) => {

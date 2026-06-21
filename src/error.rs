@@ -1,7 +1,5 @@
 #[derive(Debug)]
 pub enum Error {
     MemoryNotFound,
-    MemoryRegNotFound,
-    MemorySizeNotFound,
-    MemoryRangeNotFound,
+    Fdt,
 }

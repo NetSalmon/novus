@@ -1,6 +1,6 @@
 use crate::arch::registers::{ReadableRegister, WritableRegister};
 use crate::arch::sbi::srst::{ResetReason, ResetType, system_reset};
-use crate::{SStatusBits, arch, syscall, get_tag_address, read_as_array, debug, numeric};
+use crate::{SStatusBits, arch, debug, get_tag_address, numeric, read_as_array, syscall};
 
 const INTERRUPT_MASK: i64 = 1 << 63;
 
@@ -84,7 +84,7 @@ fn trap_handler(scause: u64, sepc: u64, _stval: u64, _sstatus: u64, trap_frame_s
 
     match trap {
         Trap::Interrupt(Interrupt::SupervisorTimer) => {
-            crate::set_time();
+            set_time();
         }
         Trap::Exception(Exception::UModeEcall) => {
             read_as_array!(args: u64 => trap_frame_sp, 10 => 8);
@@ -123,4 +123,11 @@ fn trap_handler(scause: u64, sepc: u64, _stval: u64, _sstatus: u64, trap_frame_s
         }
         _ => {}
     }
+}
+
+#[inline]
+pub fn set_time() {
+    const GAP: u64 = 1_000_000; // 10 Hz
+    let t = arch::registers::csr::Time::read();
+    arch::registers::csr::Stimecmp::write(t + GAP);
 }
