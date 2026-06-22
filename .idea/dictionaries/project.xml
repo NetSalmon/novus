@@ -5,6 +5,9 @@
       <w>Sfence</w>
       <w>Shmem</w>
       <w>asid</w>
+      <w>balign</w>
+      <w>csrs</w>
+      <w>csrsi</w>
       <w>ebss</w>
       <w>edata</w>
       <w>ekernel</w>
@@ -21,6 +24,7 @@
       <w>srodata</w>
       <w>stext</w>
       <w>stime</w>
+      <w>stvec</w>
     </words>
   </dictionary>
 </component>

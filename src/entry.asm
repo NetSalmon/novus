@@ -20,9 +20,9 @@ _start:
 .global trap_entry
 trap_entry:
     addi sp, sp, -256
-    # sd x0, 0(sp) zero
+    sd x0, 0(sp)
     sd x1, 8(sp)
-    # sd x2, 16(sp) sp
+    sd x2, 16(sp)
     sd x3, 24(sp)
     sd x4, 32(sp)
     sd x5, 40(sp)
@@ -61,9 +61,9 @@ trap_entry:
 
     call trap_handler
 
-    # ld x0, 0(sp)
+    ld x0, 0(sp)
     ld x1, 8(sp)
-    # ld x2, 16(sp)
+    ld x2, 16(sp)
     ld x3, 24(sp)
     ld x4, 32(sp)
     ld x5, 40(sp)

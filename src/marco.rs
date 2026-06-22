@@ -91,6 +91,102 @@ macro_rules! get_tag_address {
     };
 }
 
+/// A macro for defining numeric enums with bidirectional conversions to/from their underlying integer type.
+///
+/// This macro simplifies the creation of C-style integer-backed enums, automatically implementing
+/// the necessary `From` and `TryFrom` traits. It supports two modes:
+///
+/// 1. **Strict mode** (default, without `@fallback`): The enum variants are the only valid values for the
+///    integer type. Trying to convert an integer that doesn't match any variant will result in a
+///    [`TryFrom`] error returning the original integer.
+///    Implements [`TryFrom<$t>`] for the enum, and [`From<$enum>`] for the integer.
+///
+/// 2. **Fallback mode** (invoked with `@fallback`): An additional `Reserved($t)` variant is added to
+///    capture any integer value that doesn't correspond to a named variant. Conversions are infallible
+///    in both directions via [`From`]. This is useful when the integer may be extended in the future
+///    and unknown values must be preserved.
+///
+/// # Syntax
+///
+/// Strict mode:
+/// ```ignore
+/// numeric! {
+///     $( #[$attr] )*
+///     pub enum EnumName : IntegerType {
+///         $(
+///             VariantName = integer_expression,
+///         )*
+///     }
+/// }
+/// ```
+///
+/// Fallback mode:
+/// ```ignore
+/// numeric! {
+///     @fallback
+///     $( #[$attr] )*
+///     pub enum EnumName : IntegerType {
+///         $(
+///             VariantName = integer_expression,
+///         )*
+///     }
+/// }
+/// ```
+///
+/// # Example (Strict)
+///
+/// ```
+/// use my_crate::numeric; // adjust
+///
+/// numeric! {
+///     /// A simple status code.
+///     pub enum Status : u8 {
+///         Ok = 0,
+///         Error = 1,
+///         Pending = 2,
+///     }
+/// }
+///
+/// let s: Status = Status::Ok;
+/// let val: u8 = s.into();
+/// assert_eq!(val, 0);
+///
+/// let maybe_status = Status::try_from(1u8);
+/// assert_eq!(maybe_status, Ok(Status::Error));
+/// let bad = Status::try_from(3u8);
+/// assert_eq!(bad, Err(3));
+/// ```
+///
+/// # Example (Fallback)
+///
+/// ```
+/// numeric! {
+///     @fallback
+///     /// An extensible color value.
+///     pub enum Color : u16 {
+///         Red = 0xFF00,
+///         Green = 0x00FF,
+///         Blue = 0x000F,
+///     }
+/// }
+///
+/// let c: Color = Color::Blue;
+/// let val: u16 = c.into();
+/// assert_eq!(val, 0x000F);
+///
+/// let unknown = Color::from(0x1234);
+/// assert!(matches!(unknown, Color::Reserved(0x1234)));
+/// ```
+///
+/// # Note
+///
+/// - In fallback mode, the `Reserved` variant holds the raw integer value, so pattern matching must
+///   account for it.
+/// - In strict mode, all integer expressions must evaluate to compile‑time constants that fit into
+///   `$t`. The macro does not enforce uniqueness; duplicate values are allowed but will cause
+///   ambiguous `TryFrom` conversions (the first match wins).
+/// - Attributes can be applied to the enum definition (e.g., `#[derive(Debug, Clone)]`).
+/// ```
 #[macro_export]
 macro_rules! numeric {
     ($( #[$attr:meta] )* pub enum $name:ident : $t:ty { $( $item:ident = $value:expr ),* $(,)? }) => {

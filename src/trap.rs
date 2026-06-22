@@ -1,6 +1,7 @@
 use crate::arch::registers::{ReadableRegister, WritableRegister};
 use crate::arch::sbi::srst::{ResetReason, ResetType, system_reset};
-use crate::{SStatusBits, arch, debug, get_tag_address, numeric, read_as_array, syscall};
+use crate::{arch, debug, get_tag_address, numeric, read_as_array, syscall};
+use crate::usr::SStatusBits;
 
 const INTERRUPT_MASK: i64 = 1 << 63;
 

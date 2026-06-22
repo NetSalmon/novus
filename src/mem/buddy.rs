@@ -91,8 +91,7 @@ impl Buddy {
 
     pub fn debug(&self) {
         for (idx, order) in self.free_list.iter().enumerate() {
-            print!("Order {:0>2}: ", idx);
-            order.debug();
+            print!("Order {:0>2}: {:?}", idx, order);
             println!();
         }
     }
