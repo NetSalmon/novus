@@ -2,7 +2,7 @@
 .global _start
 .balign 4
 _start:
-    la sp, boot_stack_top
+    la sp, kernel_stack_top
 
     la t0, trap_entry
     andi t0, t0, ~3
@@ -101,10 +101,10 @@ trap_entry:
 .section .bss.stack
 .global boot_stack_lower_bound
 .global user_stack_lower_bound
-boot_stack_lower_bound:
+kernel_stack_lower_bound:
     .space 4096 * 16
-    .global boot_stack_top
-boot_stack_top:
+    .global kernel_stack_top
+kernel_stack_top:
 
 user_stack_lower_bound:
     .space 4096 * 16

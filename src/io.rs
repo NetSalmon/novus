@@ -1,5 +1,5 @@
-use crate::dev::ns16550a::Ns16550a;
 use crate::dev::DEV_TREE;
+use crate::dev::ns16550a::Ns16550a;
 use core::fmt;
 
 impl fmt::Write for Ns16550a {

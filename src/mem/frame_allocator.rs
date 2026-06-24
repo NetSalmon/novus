@@ -1,14 +1,14 @@
+use crate::mem::linked_list::LinkedList;
 use crate::{debug, print, println};
 use core::ops::Range;
-use crate::mem::linked_list::LinkedList;
 
 pub const MAX_ORDER: usize = 11;
 
-pub struct Buddy {
+pub struct BuddyAllocator {
     pub free_list: [LinkedList; MAX_ORDER],
 }
 
-impl Buddy {
+impl BuddyAllocator {
     pub const fn new() -> Self {
         Self {
             free_list: [LinkedList::new(); MAX_ORDER],
@@ -39,7 +39,7 @@ impl Buddy {
         self.add_frame(start, range.end);
     }
 
-    fn alloc(&mut self, order: usize) -> Option<usize> {
+    pub(crate) fn alloc(&mut self, order: usize) -> Option<usize> {
         for i in order..self.free_list.len() {
             if self.free_list[i].is_empty() {
                 continue;
@@ -58,7 +58,7 @@ impl Buddy {
         None
     }
 
-    fn dealloc(&mut self, start: usize, order: usize) {
+    pub(crate) fn dealloc(&mut self, start: usize, order: usize) {
         let mut current_ptr = start;
         let mut current_order = order;
 
@@ -121,4 +121,3 @@ pub fn get_buddy(base: usize, order: usize) -> usize {
 pub fn order_size(order: usize) -> usize {
     1 << order << 12
 }
-

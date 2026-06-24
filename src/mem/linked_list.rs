@@ -69,7 +69,9 @@ impl LinkedList {
 
 impl fmt::Debug for LinkedList {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_list().entries(self.iter().map(|p| p as usize)).finish()
+        f.debug_list()
+            .entries(self.iter().map(|p| p as usize))
+            .finish()
     }
 }
 
@@ -150,6 +152,16 @@ impl<T> RawLinkedList<T> {
             (*node).next = self.head;
         }
         self.head = node;
+    }
+
+    pub fn push_at(&mut self, addr: *mut RawLinkedListNode<T>, val: T) {
+        unsafe {
+            addr.write(RawLinkedListNode {
+                data: val,
+                next: self.head,
+            });
+        }
+        self.head = addr;
     }
 
     pub fn pop(&mut self) -> Option<*mut RawLinkedListNode<T>> {

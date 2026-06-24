@@ -12,8 +12,8 @@ mod syscall;
 mod trap;
 mod usr;
 
-use crate::arch::registers::{WritableRegister};
-use crate::arch::sbi::srst::{system_reset, ResetReason, ResetType};
+use crate::arch::registers::WritableRegister;
+use crate::arch::sbi::srst::{ResetReason, ResetType, system_reset};
 use core::arch::{asm, global_asm};
 use core::panic::PanicInfo;
 use core::sync::atomic::{AtomicUsize, Ordering};
@@ -21,12 +21,23 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 global_asm!(include_str!("entry.asm"));
 
 pub static FDT_ADDRESS: AtomicUsize = AtomicUsize::new(0);
-pub const KERNEL_OFFSET: usize = 0xffffffc000000000;
-unsafe extern "C" { pub fn _end(); }
+pub static ROOT_PAGE_TABLE_ADDRESS: AtomicUsize = AtomicUsize::new(0);
+
+unsafe extern "C" {
+    pub fn _end();
+    pub static PAGE_OFFSET: usize;
+}
+
+#[inline]
+pub fn page_offset() -> usize {
+    unsafe { PAGE_OFFSET }
+}
 
 #[unsafe(no_mangle)]
 fn main(hart_id: usize, dev_tree_address: usize) -> ! {
-    if hart_id != 0 { core::hint::spin_loop(); }
+    if hart_id != 0 {
+        core::hint::spin_loop();
+    }
 
     FDT_ADDRESS.swap(dev_tree_address, Ordering::Relaxed);
 
@@ -41,7 +52,9 @@ fn main(hart_id: usize, dev_tree_address: usize) -> ! {
 #[unsafe(no_mangle)]
 fn kernel_do_no_thing() -> ! {
     debug!("do no thing");
-    loop { core::hint::spin_loop(); }
+    loop {
+        core::hint::spin_loop();
+    }
 }
 
 #[panic_handler]
@@ -60,5 +73,7 @@ fn panic_handle(info: &PanicInfo) -> ! {
 
     let _ = system_reset(ResetType::Shutdown, ResetReason::None);
 
-    loop { core::hint::spin_loop(); }
+    loop {
+        core::hint::spin_loop();
+    }
 }

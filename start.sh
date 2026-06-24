@@ -1,9 +1,5 @@
 #!/usr/bin/bash
 
-riscv64-elf-objcopy -O binary \
-    target/riscv64gc-unknown-none-elf/release/novus \
-    target/riscv64gc-unknown-none-elf/release/os.bin
-
 QEMU_ARGS=(
     -machine virt
     -nographic
@@ -12,7 +8,7 @@ QEMU_ARGS=(
     -trace virtio_blk_submit_multireq
     -trace virtio_blk_rw_complete
     -trace virtio_blk_req_complete
-    -kernel target/riscv64gc-unknown-none-elf/release/os.bin
+    -kernel target/riscv64gc-unknown-none-elf/release/novus
 )
 
 QEMU_OPTS=()

@@ -1,7 +1,6 @@
-use core::arch::asm;
-use crate::{arch, bits, get_tag_address};
 use crate::arch::registers::{ReadableRegister, WritableRegister};
-
+use crate::{arch, bits, get_tag_address};
+use core::arch::asm;
 
 bits! {
     pub type SStatusBits: u64 {
@@ -18,7 +17,6 @@ macro_rules! turn_to_user_program {
         unsafe { asm!("sret") }
     };
 }
-
 
 #[inline]
 pub fn into_u_mode() {

@@ -2,4 +2,5 @@
 pub enum Error {
     MemoryNotFound,
     Fdt,
+    OutOfMemory,
 }
