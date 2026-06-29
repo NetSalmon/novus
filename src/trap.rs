@@ -122,7 +122,7 @@ fn trap_handler(scause: u64, sepc: u64, _stval: u64, _sstatus: u64, trap_frame_s
         ) => {
             system_reset(ResetType::Shutdown, ResetReason::SysFail);
         }
-        _ => {}
+        _ => core::hint::spin_loop(),
     }
 }
 

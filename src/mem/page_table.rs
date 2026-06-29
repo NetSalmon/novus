@@ -1,7 +1,14 @@
-use core::sync::atomic::{AtomicUsize, Ordering};
-use crate::bits;
+use crate::arch::registers::WritableRegister;
+use crate::arch::registers::csr::Satp;
+use crate::arch::registers::values::{SatpMode, SatpValue};
+use crate::dev::DEV_TREE;
+use crate::locks::LazyLock;
+use crate::mem::PAGE_SIZE;
 use crate::mem::addr::{PhysicalAddr, VirtualAddr};
-use crate::mem::frame::alloc;
+use crate::mem::frame_allocator::alloc_frame;
+use crate::{bits, debug};
+use core::arch::asm;
+use core::ops::Deref;
 
 bits! {
     pub type PageTableEntry: u64 {
@@ -36,9 +43,16 @@ bits! {
     }
 }
 
-pub static ROOT_PAGE_TABLE: AtomicUsize = AtomicUsize::new(0);
+pub static ROOT_PAGE_TABLE: LazyLock<usize> = LazyLock::new(|| {
+    let root_addr = alloc_frame().expect("out of memory");
+
+    unsafe { (root_addr as *mut PageTable).write(PageTable::new()) };
+
+    root_addr
+});
 
 #[repr(align(4096))]
+#[derive(Debug)]
 pub struct PageTable {
     entries: [PageTableEntry; 512],
 }
@@ -83,17 +97,10 @@ impl PageTable {
     }
 }
 
-pub fn init_page_table() {
-    let root_addr = alloc();
-
-    unsafe { (root_addr as *mut PageTable).write(PageTable::new()) };
-
-    ROOT_PAGE_TABLE.store(root_addr, Ordering::Relaxed);
-}
-
+#[inline]
 fn get_or_create_table(pte: &mut PageTableEntry) -> &mut PageTable {
     if !pte.v() {
-        let addr = alloc();
+        let addr = alloc_frame().expect("out of memory");
         unsafe { (addr as *mut PageTable).write(PageTable::new()) };
         pte.set_ppn((addr >> 12) as u64);
         pte.set_v(true);
@@ -102,8 +109,9 @@ fn get_or_create_table(pte: &mut PageTableEntry) -> &mut PageTable {
     unsafe { &mut *((ppn << 12) as *mut PageTable) }
 }
 
-pub fn map(va: VirtualAddr, pa: PhysicalAddr) {
-    let root_pa = ROOT_PAGE_TABLE.load(Ordering::Relaxed);
+#[inline]
+pub fn map(va: VirtualAddr, pa: PhysicalAddr, flash: bool, u: bool) {
+    let root_pa = *ROOT_PAGE_TABLE.force();
     let root = unsafe { &mut *(root_pa as *mut PageTable) };
 
     let l1_table = get_or_create_table(&mut root.entries[va.vpn2()]);
@@ -115,14 +123,18 @@ pub fn map(va: VirtualAddr, pa: PhysicalAddr) {
     pte.set_r(true);
     pte.set_w(true);
     pte.set_x(true);
+    pte.set_u(u);
     pte.set_ppn(pa.ppn() as u64);
     l0_table.entries[vpn0] = pte;
 
-    unsafe { core::arch::asm!("sfence.vma {}", in(reg) *va) }
+    if flash {
+        unsafe { asm!("sfence.vma") }
+    }
 }
 
-pub fn unmap(va: VirtualAddr) {
-    let root_pa = ROOT_PAGE_TABLE.load(Ordering::Relaxed);
+#[inline]
+pub fn unmap(va: VirtualAddr, flash: bool) {
+    let root_pa = *ROOT_PAGE_TABLE.force();
     let root = unsafe { &mut *(root_pa as *mut PageTable) };
 
     let pte2 = &root.entries[va.vpn2()];
@@ -139,5 +151,60 @@ pub fn unmap(va: VirtualAddr) {
 
     l0_table.entries[va.vpn0()] = PageTableEntry::new();
 
-    unsafe { core::arch::asm!("sfence.vma {}", in(reg) *va) }
+    if flash {
+        unsafe { asm!("sfence.vma") }
+    }
+}
+
+pub fn equal_mapping() {
+    debug!("start equal mapping memory");
+    let start = DEV_TREE.memory.device.mmio.start;
+    let end = start + DEV_TREE.memory.device.mmio.size;
+
+    for i in (start..end).step_by(PAGE_SIZE) {
+        map(VirtualAddr::from(i), PhysicalAddr::from(i), false, false);
+    }
+
+    if let Some(ref uart) = DEV_TREE.ns16550a {
+        let start = uart.lock().device.mmio.start;
+        map(
+            VirtualAddr::from(start),
+            PhysicalAddr::from(start),
+            false,
+            false,
+        );
+    }
+
+    if let Some(ref blk) = DEV_TREE.virtio_blk {
+        let start = blk.device.mmio.start;
+        let end = start + blk.device.mmio.size;
+
+        for i in (start..end).step_by(PAGE_SIZE) {
+            map(VirtualAddr::from(i), PhysicalAddr::from(i), false, false);
+        }
+    }
+
+    debug!("map ok");
+
+    let root_pt_addr = PhysicalAddr::from(*ROOT_PAGE_TABLE.force());
+    debug!("root pt addr at: {:?}", root_pt_addr);
+
+    let ppn = root_pt_addr.ppn() as u64;
+
+    let mut value = SatpValue::new();
+    value.set_ppn(ppn);
+    value.set_mode(SatpMode::Sv39.into());
+
+    debug!("value: {:?}", value);
+
+    Satp::write(value.into());
+
+    debug!("storage satp ok");
+    flash();
+    debug!("equal mapping memory end");
+}
+
+#[inline]
+pub fn flash() {
+    unsafe { asm!("sfence.vma") }
 }

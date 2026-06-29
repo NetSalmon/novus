@@ -2,6 +2,7 @@
 #![no_main]
 mod arch;
 mod dev;
+mod elf;
 mod error;
 mod io;
 mod locks;
@@ -14,6 +15,8 @@ mod usr;
 
 use crate::arch::registers::WritableRegister;
 use crate::arch::sbi::srst::{ResetReason, ResetType, system_reset};
+use crate::mem::addr::{PhysicalAddr, VirtualAddr};
+use crate::mem::page_table::{equal_mapping, map, PageTable, ROOT_PAGE_TABLE};
 use core::arch::{asm, global_asm};
 use core::panic::PanicInfo;
 use core::sync::atomic::{AtomicUsize, Ordering};
@@ -43,8 +46,23 @@ fn main(hart_id: usize, dev_tree_address: usize) -> ! {
 
     debug!("kernel end: {:#x}", _end as *const () as usize);
 
-    usr::into_u_mode();
-    turn_to_user_program!("user_mode_test");
+    equal_mapping();
+
+    debug!("page table setup ok");
+
+    // get_tag_address!(user_program: usize = "user_mode_test");
+    // map(VirtualAddr::from(user_program), PhysicalAddr::from(user_program), true, true);
+    //
+    // debug!("set user program permission");
+    //
+    // usr::into_u_mode();
+    // turn_to_user_program!("user_mode_test");
+
+    let root_page_table = unsafe { ((*ROOT_PAGE_TABLE.force()) as *mut PageTable).read_volatile() };
+    println!("{:#?}", root_page_table);
+
+    // save time
+    system_reset(ResetType::Shutdown, ResetReason::None);
 
     kernel_do_no_thing()
 }

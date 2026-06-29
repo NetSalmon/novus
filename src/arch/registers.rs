@@ -2,6 +2,7 @@
 pub mod csr;
 #[allow(unused)]
 pub mod gpr;
+pub mod values;
 
 pub trait ReadableRegister {
     fn read() -> u64;

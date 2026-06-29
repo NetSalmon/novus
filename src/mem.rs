@@ -1,5 +1,5 @@
 pub mod addr;
-pub mod frame;
+pub mod buddy_system;
 pub mod frame_allocator;
 pub mod linked_list;
 pub mod page_table;
