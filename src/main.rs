@@ -16,7 +16,7 @@ mod usr;
 use crate::arch::registers::WritableRegister;
 use crate::arch::sbi::srst::{ResetReason, ResetType, system_reset};
 use crate::mem::addr::{PhysicalAddr, VirtualAddr};
-use crate::mem::page_table::{equal_mapping, map, PageTable, ROOT_PAGE_TABLE};
+use crate::mem::page_table::{PageTable, ROOT_PAGE_TABLE, equal_mapping, map};
 use core::arch::{asm, global_asm};
 use core::panic::PanicInfo;
 use core::sync::atomic::{AtomicUsize, Ordering};
