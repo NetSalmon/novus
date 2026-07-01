@@ -7,6 +7,7 @@
       <sourceFolder url="file://$MODULE_DIR$/buddy/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/applications/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/thaterror/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/novus_macros/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/software/target" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
       <excludeFolder url="file://$MODULE_DIR$/.claude" />
@@ -14,6 +15,7 @@
       <excludeFolder url="file://$MODULE_DIR$/buddy/target" />
       <excludeFolder url="file://$MODULE_DIR$/applications/target" />
       <excludeFolder url="file://$MODULE_DIR$/thaterror/target" />
+      <excludeFolder url="file://$MODULE_DIR$/novus_macros/target" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />

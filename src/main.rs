@@ -12,6 +12,7 @@ mod mem;
 mod syscall;
 mod trap;
 mod usr;
+mod proc;
 
 use crate::arch::registers::WritableRegister;
 use crate::arch::sbi::srst::{ResetReason, ResetType, system_reset};

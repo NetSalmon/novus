@@ -1,4 +1,4 @@
-use crate::numeric;
+use crate::{array_struct, bits, numeric};
 
 #[repr(C)]
 pub struct Elf32Ehdr {
@@ -17,6 +17,7 @@ pub struct Elf32Ehdr {
     pub e_shnum: u16,
     pub e_shstrndx: u16,
 }
+
 #[repr(C)]
 pub struct Elf64Ehdr {
     pub e_ident: EIdent,
@@ -68,7 +69,7 @@ numeric! {
         Intel960 = 19,          // Intel 80960
         PowerPC = 20,           // PowerPC
         PPC64 = 21,             // 64-bit PowerPC
-        S390 = 22,              //IBM System/390 Processor
+        S390 = 22,              // IBM System/390 Processor
         V800 = 36,              // NEC V800
         FR20 = 37,              // Fujitsu FR20
         RH32 = 38,              // TRW RH-32
@@ -100,7 +101,7 @@ numeric! {
         PDP10 = 64,             // Digital Equipment Corp. PDP-10
         PDP11 = 65,             // Digital Equipment Corp. PDP-11
         FX66 = 66,              // Siemens FX66 microcontroller
-        ST9PLUS = 67,           // STMicroelectronics ST9+ 8/16 bit microcontroller
+        ST9PLUS = 67,           // STMicroelectronics ST9+ 8/16-bit microcontroller
         ST7 = 68,               // STMicroelectronics ST7 8-bit microcontroller
         Motorola68HC16 = 69,    // Motorola MC68HC16 Microcontroller
         Motorola68HC11 = 70,    // Motorola MC68HC11 Microcontroller
@@ -139,80 +140,28 @@ numeric! {
 
 numeric! {
     pub enum EVersion : u32 {
-        None	= 0,	// Invalid version
-        Current = 1,	// Current version
+        None = 0,         // Invalid version
+        Current = 1,         // Current version
     }
 }
 
-#[repr(transparent)]
-pub struct EIdent(pub [u8; 16]);
-
-impl EIdent {
-    pub fn is_elf(&self) -> bool {
-        self.0[0] == 0x7f && self.0[1] == b'E' && self.0[2] == b'L' && self.0[3] == b'F'
-    }
-
-    pub fn class(&self) -> Result<Class, u8> {
-        self.0[4].try_into()
-    }
-
-    pub fn set_class(&mut self, class: Class) {
-        self.0[4] = class.into();
-    }
-
-    pub fn data(&self) -> Result<Endianess, u8> {
-        self.0[5].try_into()
-    }
-
-    pub fn set_data(&mut self, data: Endianess) {
-        self.0[5] = data.into();
-    }
-
-    pub fn version(&self) -> u8 {
-        self.0[6]
-    }
-
-    pub fn set_version(&mut self, version: u8) {
-        self.0[6] = version;
-    }
-
-    pub fn os_abi(&self) -> OsAbi {
-        self.0[7].into()
-    }
-
-    pub fn set_os_abi(&mut self, os_abi: OsAbi) {
-        self.0[7] = os_abi.into();
-    }
-
-    pub fn abi_version(&self) -> u8 {
-        self.0[8]
-    }
-
-    pub fn set_abi_version(&mut self, version: u8) {
-        self.0[8] = version;
-    }
-
-    pub fn pad(&self) -> u8 {
-        self.0[9]
-    }
-
-    pub fn set_pad(&mut self, pad: u8) {
-        self.0[9] = pad;
-    }
-    pub fn n_ident(&self) -> u8 {
-        self.0[15]
-    }
-
-    pub fn set_n_ident(&mut self, n_ident: u8) {
-        self.0[15] = n_ident;
+array_struct! {
+    pub struct EIdent : [u8; 16] {
+        class: @try Class => 4,
+        data: @try Endianess => 5,
+        version => 6,
+        os_abi: OsAbi => 7,
+        abi_version => 8,
+        pad => 9,
+        n_index => 15,
     }
 }
 
 numeric! {
     pub enum Class : u8 {
-        None = 0,	    // Invalid class
-        Class32	= 1,	// 32-bit objects
-        Class64	= 2,	// 64-bit objects
+        None = 0,             // Invalid class
+        Class32 = 1,         // 32-bit objects
+        Class64 = 2,         // 64-bit objects
     }
 }
 
@@ -240,5 +189,54 @@ numeric! {
         None = 0,
         Lsb = 1,
         Msb = 2,
+    }
+}
+
+#[repr(C)]
+pub struct Elf32Phdr {
+    pub p_type: PType,
+    pub p_offset: u32,
+    pub p_vaddr: u32,
+    pub p_paddr: u32,
+    pub p_filesz: u32,
+    pub p_memsz: u32,
+    pub p_flags: PFlags,
+    pub p_align: u32,
+}
+
+#[repr(C)]
+pub struct Elf64Phdr {
+    pub p_type: PType,
+    pub p_flags: PFlags,
+    pub p_offset: u64,
+    pub p_vaddr: u64,
+    pub p_paddr: u64,
+    pub p_filesz: u64,
+    pub p_memsz: u64,
+    pub p_align: u64,
+}
+
+numeric! {
+    pub enum PType : u32 {
+        Null = 0,
+        Load = 1,
+        Dynamic = 2,
+        Interp = 3,
+        Note = 4,
+        Shlib = 5,
+        Phdr = 6,
+        Tls = 7,
+        Loos = 0x60000000,
+        Hios = 0x6fffffff,
+        Loproc = 0x70000000,
+        Hiproc = 0x7fffffff,
+    }
+}
+
+bits! {
+    pub type PFlags : u32 {
+        read: 0,
+        write: 1,
+        execute: 2,
     }
 }

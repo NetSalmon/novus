@@ -1,42 +1,11 @@
 <component name="ProjectDictionaryState">
   <dictionary name="project">
     <words>
-      <w>Asid</w>
-      <w>Ehdr</w>
-      <w>Sfence</w>
-      <w>Shmem</w>
-      <w>Sstc</w>
-      <w>asid</w>
-      <w>balign</w>
-      <w>csrs</w>
-      <w>csrsi</w>
-      <w>ebss</w>
-      <w>edata</w>
-      <w>ehsize</w>
-      <w>ekernel</w>
-      <w>erodata</w>
-      <w>etext</w>
-      <w>fcsr</w>
-      <w>hartid</w>
-      <w>netsalmon</w>
-      <w>phentsize</w>
-      <w>phnum</w>
-      <w>phoff</w>
-      <w>riscv</w>
-      <w>rodata</w>
+      <w>Denso</w>
+      <w>Infineon</w>
+      <w>Matsushita</w>
       <w>satp</w>
-      <w>sbss</w>
-      <w>sfence</w>
-      <w>shentsize</w>
-      <w>shnum</w>
-      <w>shoff</w>
-      <w>shstrndx</w>
-      <w>skernel</w>
-      <w>srodata</w>
-      <w>stext</w>
-      <w>stime</w>
       <w>stvec</w>
-      <w>thaterror</w>
     </words>
   </dictionary>
 </component>
